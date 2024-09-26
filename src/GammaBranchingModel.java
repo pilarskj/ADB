@@ -13,6 +13,135 @@ import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
 
 public class GammaBranchingModel {// extends TreeDistribution {
 
+    public static double calcLogLikelihood(double rho, double a, double b,
+                                           double t_or, double[] int_s, double[] int_e, double[] ext_e,
+                                           int m, int maxit) {
+
+
+        // generate linearly spaced values between 0 and origin
+        double[] t_seq = new double[m];
+        double dx = t_or / (m - 1);
+        for (int i = 0; i < m; i++) {
+            t_seq[i] = dx * i;
+        }
+        assert t_seq[m - 1] == t_or;
+
+        // calculate extinction probability over time
+        double[] P0 = calcP0(rho, a, b, t_seq, dx, maxit);
+
+        // calculate probability of single descendants at tips
+        double[] P1 = calcP1(rho, a, b, ext_e, t_seq, P0, dx, maxit);
+
+        // calculate probabilities of internal branches
+        double[] B = calcB(a, b, int_s, int_e, t_seq, P0, m, maxit);
+
+        // make log and sum
+        double logP1 = 0;
+        for (int i = 0; i < P1.length; i++) {
+            logP1 += Math.log(P1[i]);
+        }
+        double logB = 0;
+        for (int i = 0; i < B.length; i++) {
+            logB += Math.log(B[i]);
+        }
+
+        // sum
+        double logL = logP1 + logB;
+        return logL;
+
+        //return P0;
+    }
+
+
+    // Function for calculating branch probabilities
+    protected static double[] calcB(double a, double b,
+                                    double[] s, double[] e, double[] t0, double[] P0,
+                                    int m, int maxit) {
+
+        // get number of branches
+        assert s.length == e.length;
+        int n = s.length;
+
+        double[] B = new double[n];
+        // for each branch:
+        for (int x = 0; x < n; x++) {
+            double sx = s[x]; // start of the branch
+            double ex = e[x]; // end of the branch
+
+            // generate linearly spaced values between start and end
+            double[] t_seq = new double[m];
+            double[] age_seq = new double[m];
+            double dx = (ex - sx) / (m - 1);
+            for (int i = 0; i < m; i++) {
+                t_seq[i] = sx + dx * i;
+                age_seq[i] = t_seq[i] - ex;
+            }
+            assert t_seq[m - 1] == ex;
+
+            // calculate the PDF of the gamma distribution
+            double[] pdf = new double[m];
+            GammaDistribution gammaDist = new GammaDistribution(b, a);
+            for (int i = 0; i < m; i++) {
+                pdf[i] = gammaDist.density(age_seq[i]);
+            }
+
+            // interpolate P0
+            LinearInterpolator interpolator = new LinearInterpolator();
+            UnivariateFunction function = interpolator.interpolate(t0, P0);
+            double[] P = new double[m];
+            for (int i = 0; i < m; i++) {
+                P[i] = function.value(t_seq[i]);
+            }
+
+            // initialize L
+            double[] L0 = pdf;
+
+            // set up iteration
+            double err = 1;
+            int it = 0;
+            double[] L = L0;
+
+            // perform FFT
+            double[] ft = padReal(pdf);
+            FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+            Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+
+            // iterate
+            while (err > 1e-12 && it < maxit) {
+
+                // multiply
+                double[] y = new double[m];
+                for (int i = 0; i < m; i++) {
+                    y[i] = P[i] * P0[i];
+                }
+
+                // partially convolve
+                double[] I = convolveFFT(Ft, y, m, dx);
+
+                // sum
+                double[] Li = new double[m];
+                for (int i = 0; i < m; i++) {
+                    Li[i] = L0[i] + 2 * I[i];
+                }
+
+                // compute error
+                EuclideanDistance norm = new EuclideanDistance();
+                err = norm.compute(L, Li);
+
+                // update
+                L = Li;
+                it++;
+            }
+            // System.err.printf("Warning: max iterations reached with error: %.2f%n", err);
+
+            // take last element
+            B[x] = L[m - 1];
+        }
+
+        return B;
+    }
+
+
     // Function for calculating the probability of a single descendant
     protected static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
 
@@ -24,8 +153,8 @@ public class GammaBranchingModel {// extends TreeDistribution {
         double[] cdf = new double[n];
         GammaDistribution gammaDist = new GammaDistribution(b, a);
         for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t[i]);
-            cdf[i] = gammaDist.cumulativeProbability(t[i]);
+            pdf[i] = gammaDist.density(t0[i]);
+            cdf[i] = gammaDist.cumulativeProbability(t0[i]);
         }
 
         // initialize L

@@ -77,6 +77,39 @@ public class FFTTest {
             System.out.println(value);
         }
     }
+
+    @Test
+    public void testLogLikelihood() {
+
+        // cf. R:
+        // tree = read.tree(text = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;")
+        // times = get_tree_times(tree = tree, t_or = 11)
+        // (extract branches)
+
+        // inputs
+        // phylodynamic parameters
+        double rho = 0.1;
+        double a = 1;
+        double b = 1;
+        double t_or = 11;
+        // branch lengths
+        double [] int_s = { 5, 8 };
+        double [] int_e = { 11, 11 };
+        double [] ext_e = { 5, 5, 8, 8 };
+        // computational options
+        int m = 1024;
+        int maxit = 100;
+
+        /*
+        double[] res = GammaBranchingModel.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_s, m, maxit);
+        for (int i = 0; i < 10; i++) {
+            System.out.println(res[i]);
+        }
+        */
+
+        double logL = GammaBranchingModel.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
+        System.out.println(logL); // not correct: returns -15.92724, should return -24.80904
+    }
 }
 
 
