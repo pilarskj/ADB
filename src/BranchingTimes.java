@@ -1,5 +1,5 @@
 import beast.base.evolution.tree.Node;
-import beast.base.evolution.tree.Tree;
+import beast.base.evolution.tree.TreeInterface;
 
 import java.util.Arrays;
 
@@ -22,7 +22,7 @@ class BranchingTimesList {
 public class BranchingTimes {
 
     // Function for getting branching times from a Tree
-    public static BranchingTimesList getBranchingTimes(Tree tree) {
+    public static BranchingTimesList getBranchingTimes(TreeInterface tree, double t_or) {
 
         // create empty arrays to store start and end times of branches
         double[] int_s = new double[0];
@@ -37,23 +37,26 @@ public class BranchingTimes {
             // start time is the node height (or divergence time of the node)
             double startTime = node.getHeight();
 
-            if (!node.isRoot()) {
+            double endTime;
+            if (node.isRoot()) {
+                // end time is the tree origin
+                endTime = t_or;
+            } else {
                 // end time is the parent node height (i.e., the divergence time of the parent)
-                double endTime = node.getParent().getHeight();
+                endTime = node.getParent().getHeight();
+            }
 
-                // if node is a tip, add to external branches, otherwise, add to internal branches
-                if (!node.isLeaf()) {
-                    // resize the arrays and accommodate the new elements
-                    int_s = Arrays.copyOf(int_s, int_s.length + 1);
-                    int_e = Arrays.copyOf(int_e, int_e.length + 1);
-                    int_s[int_s.length - 1] = startTime;
-                    int_e[int_e.length - 1] = endTime;
-                } else {
-                    ext_s = Arrays.copyOf(ext_s, ext_s.length + 1);
-                    ext_e = Arrays.copyOf(ext_e, ext_e.length + 1);
-                    ext_s[ext_s.length - 1] = startTime;
-                    ext_e[ext_e.length - 1] = endTime;
-                }
+            // if node is a tip, add to external branches, otherwise, add to internal branches
+            if (node.isLeaf()) {
+                ext_s = Arrays.copyOf(ext_s, ext_s.length + 1);
+                ext_e = Arrays.copyOf(ext_e, ext_e.length + 1);
+                ext_s[ext_s.length - 1] = startTime;
+                ext_e[ext_e.length - 1] = endTime;
+            } else {
+                int_s = Arrays.copyOf(int_s, int_s.length + 1);
+                int_e = Arrays.copyOf(int_e, int_e.length + 1);
+                int_s[int_s.length - 1] = startTime;
+                int_e[int_e.length - 1] = endTime;
             }
         }
 

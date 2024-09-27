@@ -70,6 +70,7 @@ public class BranchingTimesTest {
 
         // Define tree
         String newick = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;";
+        double t_or = 12;
 
         // Parse tree
         TreeParser tree = new TreeParser();
@@ -79,7 +80,7 @@ public class BranchingTimesTest {
 
 
         // Get branching times
-        BranchingTimesList B = BranchingTimes.getBranchingTimes(tree);
+        BranchingTimesList B = BranchingTimes.getBranchingTimes(tree, t_or);
 
         System.out.println(Arrays.toString(B.internalStartTimes));
         System.out.println(Arrays.toString(B.internalEndTimes));
