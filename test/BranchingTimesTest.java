@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
-public class TreeIntervalsTest {
+public class BranchingTimesTest {
 
     @Test
     public void testTreeIntervals() {
@@ -60,7 +60,7 @@ public class TreeIntervalsTest {
                     System.out.println("External edge (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
                 } else {
                     System.out.println("Internal edge (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
-                }
+                } // correct: store results in a reasonable object
             }
         }
     }

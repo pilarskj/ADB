@@ -54,7 +54,7 @@ public class FFTTest {
         double eps = 0.1;  // Scaling factor
 
         // Perform convolution using FFT
-        double[] result = GammaBranchingModel.convolveFFT(fx, y, n, eps);
+        double[] result = GammaLogLikelihood.convolveFFT(fx, y, n, eps);
 
         // Output the result
         for (double value : result) {
@@ -81,7 +81,7 @@ public class FFTTest {
 
         int maxit = 100;
 
-        double[] result = GammaBranchingModel.calcP0(rho, a, b, t, dx, maxit);
+        double[] result = GammaLogLikelihood.calcP0(rho, a, b, t, dx, maxit);
 
         for (double value : result) {
             System.out.println(value);
@@ -110,14 +110,7 @@ public class FFTTest {
         int m = (int)Math.pow(2, 14);
         int maxit = 100;
 
-        /*
-        double[] res = GammaBranchingModel.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_s, m, maxit);
-        for (int i = 0; i < 10; i++) {
-            System.out.println(res[i]);
-        }
-        */
-
-        double logL = GammaBranchingModel.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
+        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
         System.out.println(logL);
 
         assertEquals(logL, -25.8506,  0.05);

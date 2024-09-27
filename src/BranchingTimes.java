@@ -3,6 +3,7 @@ import beast.base.evolution.tree.Tree;
 
 import java.util.Arrays;
 
+// Object: stores branching times
 class BranchingTimesList {
     double[] internalStartTimes;
     double[] internalEndTimes;
@@ -17,8 +18,10 @@ class BranchingTimesList {
     }
 }
 
+
 public class BranchingTimes {
 
+    // Function for getting branching times from a Tree
     public static BranchingTimesList getBranchingTimes(Tree tree) {
 
         // create empty arrays to store start and end times of branches
@@ -27,18 +30,18 @@ public class BranchingTimes {
         double[] ext_s = new double[0];
         double[] ext_e = new double[0];
 
-        // Traverse all nodes and compute start/end times of all branches (backwards in time)
+        // traverse all nodes and compute start/end times of all branches (backwards in time)
         for (int i = 0; i < tree.getNodeCount(); i++) {
             Node node = tree.getNode(i);
 
-            // Start time is the node height (or divergence time of the node)
+            // start time is the node height (or divergence time of the node)
             double startTime = node.getHeight();
 
             if (!node.isRoot()) {
-                // End time is the parent node height (i.e., the divergence time of the parent)
+                // end time is the parent node height (i.e., the divergence time of the parent)
                 double endTime = node.getParent().getHeight();
 
-                // If node is a tip, add to external branches, otherwise, add to internal branches
+                // if node is a tip, add to external branches, otherwise, add to internal branches
                 if (!node.isLeaf()) {
                     // resize the arrays and accommodate the new elements
                     int_s = Arrays.copyOf(int_s, int_s.length + 1);

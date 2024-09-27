@@ -1,5 +1,3 @@
-import beast.base.evolution.tree.TreeDistribution;
-
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -11,7 +9,7 @@ import org.apache.commons.math3.analysis.UnivariateFunction;
 
 import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
 
-public class GammaBranchingModel {// extends TreeDistribution {
+public class GammaLogLikelihood {
 
     public static double calcLogLikelihood(double rho, double a, double b,
                                            double t_or, double[] int_s, double[] int_e, double[] ext_e,
