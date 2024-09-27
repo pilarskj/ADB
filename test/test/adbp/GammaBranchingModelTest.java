@@ -1,3 +1,6 @@
+package test.adbp;
+
+import adbp.GammaBranchingModel;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.parameter.RealParameter;

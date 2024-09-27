@@ -1,9 +1,14 @@
+package adbp;
+
 import beast.base.core.Input;
 import beast.base.core.Log;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
+import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
 import beast.base.inference.parameter.RealParameter;
+
+import java.util.Arrays;
 
 
 public class GammaBranchingModel extends SpeciesTreeDistribution {
@@ -46,18 +51,46 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         if (tree.getRoot().getHeight() > t_or)
             return Double.NEGATIVE_INFINITY;
 
-        // get branching times from tree
-        BranchingTimesList B = BranchingTimes.getBranchingTimes(tree, t_or);
-        double[] int_s = B.internalStartTimes;
-        double[] int_e = B.internalEndTimes;
-        double[] ext_s = B.externalStartTimes;
-        double[] ext_e = B.externalEndTimes;
-        // assert all(ext_s == 0))
-
         // set default options for calcLogLikelihood
         int m = (int)Math.pow(2, 14);
         int maxit = 100;
 
+        // get branching times from tree
+        // create empty arrays to store start and end times of branches
+        double[] int_s = new double[0];
+        double[] int_e = new double[0];
+        double[] ext_e = new double[0];
+
+        // traverse all nodes and compute start/end times of all branches (backwards in time)
+        for (int i = 0; i < tree.getNodeCount(); i++) {
+            Node node = tree.getNode(i);
+
+            // start time is the node height (or divergence time of the node)
+            double startTime = node.getHeight();
+
+            double endTime;
+            if (node.isRoot()) {
+                // end time is the tree origin
+                endTime = t_or;
+            } else {
+                // end time is the parent node height (i.e., the divergence time of the parent)
+                endTime = node.getParent().getHeight();
+            }
+
+            // if node is a tip, add times to external branches, otherwise, add to internal branches
+            if (node.isLeaf()) {
+                assert startTime == 0; // tips should have height 0
+                ext_e = Arrays.copyOf(ext_e, ext_e.length + 1);
+                ext_e[ext_e.length - 1] = endTime;
+            } else {
+                int_s = Arrays.copyOf(int_s, int_s.length + 1);
+                int_e = Arrays.copyOf(int_e, int_e.length + 1);
+                int_s[int_s.length - 1] = startTime;
+                int_e[int_e.length - 1] = endTime;
+            }
+        }
+
+        // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
         return logL;
     }

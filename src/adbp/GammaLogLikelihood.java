@@ -1,3 +1,5 @@
+package adbp;
+
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -8,6 +10,7 @@ import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
 import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
+
 
 public class GammaLogLikelihood {
 
@@ -50,7 +53,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the extinction probability
-    protected static double[] calcP0(double rho, double a, double b, double[] t, double dx, int maxit) {
+    public static double[] calcP0(double rho, double a, double b, double[] t, double dx, int maxit) {
 
         // get length
         int n = t.length;
@@ -116,7 +119,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    protected static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
+    public static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
 
         // get length
         int n = t0.length;
@@ -190,7 +193,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating branch probabilities
-    protected static double[] calcB(double a, double b,
+    public static double[] calcB(double a, double b,
                                     double[] s, double[] e, double[] t0, double[] P0,
                                     int m, int maxit) {
 
@@ -282,7 +285,7 @@ public class GammaLogLikelihood {
 
 
     // Function for partial convolution using FFT
-    protected static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+    public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
         // pad y
         double[] y_ext = padReal(y);

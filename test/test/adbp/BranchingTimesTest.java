@@ -1,10 +1,11 @@
+package test.adbp;
+
 import beast.base.evolution.tree.TreeParser;
 import beast.base.evolution.tree.TreeIntervals;
 import beast.base.evolution.tree.Node;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 
 public class BranchingTimesTest {
 
@@ -34,7 +35,7 @@ public class BranchingTimesTest {
     }
 
     @Test
-    public void testTreeEdgeTimes() {
+    public void testBranchingTimes() {
 
         // Define tree
         String newick = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;";
@@ -60,31 +61,8 @@ public class BranchingTimesTest {
                     System.out.println("External edge (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
                 } else {
                     System.out.println("Internal edge (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
-                } // correct: store results in a reasonable object
+                } // correct!
             }
         }
-    }
-
-    @Test
-    public void testBranchingTimes() {
-
-        // Define tree
-        String newick = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;";
-        double t_or = 12;
-
-        // Parse tree
-        TreeParser tree = new TreeParser();
-        tree.initByName("IsLabelledNewick", true,
-                "newick", newick,
-                "adjustTipHeights", false);
-
-
-        // Get branching times
-        BranchingTimesList B = BranchingTimes.getBranchingTimes(tree, t_or);
-
-        System.out.println(Arrays.toString(B.internalStartTimes));
-        System.out.println(Arrays.toString(B.internalEndTimes));
-        System.out.println(Arrays.toString(B.externalStartTimes));
-        System.out.println(Arrays.toString(B.externalEndTimes));
     }
 }
