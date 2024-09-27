@@ -48,8 +48,146 @@ public class GammaBranchingModel {// extends TreeDistribution {
         // sum
         double logL = logP1 + logB;
         return logL;
+    }
 
-        //return P0;
+
+    // Function for calculating the extinction probability
+    protected static double[] calcP0(double rho, double a, double b, double[] t, double dx, int maxit) {
+
+        // get length
+        int n = t.length;
+
+        // calculate the PDF and CDF of the gamma distribution
+        double[] pdf = new double[n];
+        double[] cdf = new double[n];
+        GammaDistribution gammaDist = new GammaDistribution(b, a);
+        for (int i = 0; i < n; i++) {
+            pdf[i] = gammaDist.density(t[i]);
+            cdf[i] = gammaDist.cumulativeProbability(t[i]);
+        }
+
+        // initialize
+        double[] X0 = new double[n];
+        for (int i = 0; i < n; i++) {
+            X0[i] = (1 - rho) * (1 - cdf[i]);
+        }
+
+        // set up iteration
+        double err = 1;
+        int it = 0;
+        double[] X = X0;
+
+        // perform FFT
+        double[] ft = padReal(pdf);
+        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+        Complex[] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+
+        // iterate
+        while (err > 1e-12 && it < maxit) {
+
+            // square
+            double[] y = new double[n];
+            for (int i = 0; i < n; i++) {
+                y[i] = X[i] * X[i];
+            }
+
+            // partially convolve
+            double[] I = convolveFFT(Ft, y, n, dx);
+
+            // sum
+            double[] Xi = new double[n];
+            for (int i = 0; i < n; i++) {
+                Xi[i] = X0[i] + I[i];
+            }
+
+            // compute error
+            EuclideanDistance norm = new EuclideanDistance();
+            err = norm.compute(Xi, X);
+
+            // update
+            X = Xi;
+            it++;
+        }
+
+        if (it == maxit) {
+            System.err.printf("calcP0 Warning: max iterations reached with error: %.2f%n", err);
+        }
+
+        return X;
+    }
+
+
+    // Function for calculating the probability of a single descendant
+    protected static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
+
+        // get length
+        int n = t0.length;
+
+        // calculate the PDF and CDF of the gamma distribution
+        double[] pdf = new double[n];
+        double[] cdf = new double[n];
+        GammaDistribution gammaDist = new GammaDistribution(b, a);
+        for (int i = 0; i < n; i++) {
+            pdf[i] = gammaDist.density(t0[i]);
+            cdf[i] = gammaDist.cumulativeProbability(t0[i]);
+        }
+
+        // initialize
+        double[] X0 = new double[n];
+        for (int i = 0; i < n; i++) {
+            X0[i] = rho * (1 - cdf[i]);
+        }
+
+        // set up iteration
+        double err = 1;
+        int it = 0;
+        double[] X = X0;
+
+        // perform FFT
+        double[] ft = padReal(pdf);
+        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+        Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+
+        // iterate
+        while (err > 1e-12 && it < maxit) {
+
+            // multiply
+            double[] y = new double[n];
+            for (int i = 0; i < n; i++) {
+                y[i] = P0[i] * X[i];
+            }
+
+            // partially convolve
+            double[] I = convolveFFT(Ft, y, n, dx);
+
+            // sum
+            double[] Xi = new double[n];
+            for (int i = 0; i < n; i++) {
+                Xi[i] = X0[i] + 2 * I[i];
+            }
+
+            // compute error
+            EuclideanDistance norm = new EuclideanDistance();
+            err = norm.compute(X, Xi);
+
+            // update
+            X = Xi;
+            it++;
+        }
+
+        if (it == maxit) {
+            System.err.printf("calcP1 Warning: max iterations reached with error: %.2f%n", err);
+        }
+
+        // interpolate
+        LinearInterpolator interpolator = new LinearInterpolator();
+        UnivariateFunction function = interpolator.interpolate(t0, X);
+        double[] P1 = new double[t.length];
+        for (int i = 0; i < t.length; i++) {
+            P1[i] = function.value(t[i]);
+        }
+
+        return P1;
     }
 
 
@@ -74,7 +212,7 @@ public class GammaBranchingModel {// extends TreeDistribution {
             double dx = (ex - sx) / (m - 1);
             for (int i = 0; i < m; i++) {
                 t_seq[i] = sx + dx * i;
-                age_seq[i] = t_seq[i] - ex;
+                age_seq[i] = t_seq[i] - sx;
             }
             assert t_seq[m - 1] == ex;
 
@@ -93,13 +231,13 @@ public class GammaBranchingModel {// extends TreeDistribution {
                 P[i] = function.value(t_seq[i]);
             }
 
-            // initialize L
-            double[] L0 = pdf;
+            // initialize
+            double[] X0 = pdf;
 
             // set up iteration
             double err = 1;
             int it = 0;
-            double[] L = L0;
+            double[] X = X0;
 
             // perform FFT
             double[] ft = padReal(pdf);
@@ -112,166 +250,36 @@ public class GammaBranchingModel {// extends TreeDistribution {
                 // multiply
                 double[] y = new double[m];
                 for (int i = 0; i < m; i++) {
-                    y[i] = P[i] * P0[i];
+                    y[i] = P[i] * X[i];
                 }
 
                 // partially convolve
                 double[] I = convolveFFT(Ft, y, m, dx);
 
                 // sum
-                double[] Li = new double[m];
+                double[] Xi = new double[m];
                 for (int i = 0; i < m; i++) {
-                    Li[i] = L0[i] + 2 * I[i];
+                    Xi[i] = X0[i] + 2 * I[i];
                 }
 
                 // compute error
                 EuclideanDistance norm = new EuclideanDistance();
-                err = norm.compute(L, Li);
+                err = norm.compute(X, Xi);
 
                 // update
-                L = Li;
+                X = Xi;
                 it++;
             }
-            // System.err.printf("Warning: max iterations reached with error: %.2f%n", err);
+
+            if (it == maxit) {
+                System.err.printf("calcB Warning: max iterations reached with error: %.2f%n", err);
+            }
 
             // take last element
-            B[x] = L[m - 1];
+            B[x] = X[m - 1];
         }
 
         return B;
-    }
-
-
-    // Function for calculating the probability of a single descendant
-    protected static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
-
-        // get length
-        int n = t0.length;
-
-        // calculate the PDF and CDF of the gamma distribution
-        double[] pdf = new double[n];
-        double[] cdf = new double[n];
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
-        for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t0[i]);
-            cdf[i] = gammaDist.cumulativeProbability(t0[i]);
-        }
-
-        // initialize L
-        double[] L0 = new double[n];
-        for (int i = 0; i < n; i++) {
-            L0[i] = rho * (1.0 - cdf[i]);
-        }
-
-        // set up iteration
-        double err = 1;
-        int it = 0;
-        double[] L = L0;
-
-        // perform FFT
-        double[] ft = padReal(pdf);
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
-
-        // iterate
-        while (err > 1e-12 && it < maxit) {
-
-            // multiply
-            double[] y = new double[n];
-            for (int i = 0; i < n; i++) {
-                y[i] = P0[i] * L[i];
-            }
-
-            // partially convolve
-            double[] I = convolveFFT(Ft, y, n, dx);
-
-            // sum
-            double[] Li = new double[n];
-            for (int i = 0; i < n; i++) {
-                Li[i] = L0[i] + 2 * I[i];
-            }
-
-            // compute error
-            EuclideanDistance norm = new EuclideanDistance();
-            err = norm.compute(L, Li);
-
-            // update
-            L = Li;
-            it++;
-        }
-        // System.err.printf("Warning: max iterations reached with error: %.2f%n", err);
-
-        // interpolate
-        LinearInterpolator interpolator = new LinearInterpolator();
-        UnivariateFunction function = interpolator.interpolate(t0, L);
-        double[] P1 = new double[t.length];
-        for (int i = 0; i < t.length; i++) {
-            P1[i] = function.value(t[i]);
-        }
-
-        return P1;
-    }
-
-
-    // Function for calculating the extinction probability
-    protected static double[] calcP0(double rho, double a, double b, double[] t, double dx, int maxit) {
-
-        // get length
-        int n = t.length;
-
-        // calculate the PDF and CDF of the gamma distribution
-        double[] pdf = new double[n];
-        double[] cdf = new double[n];
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
-        for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t[i]);
-            cdf[i] = gammaDist.cumulativeProbability(t[i]);
-        }
-
-        // initialize P00
-        double[] P00 = new double[n];
-        for (int i = 0; i < n; i++) {
-            P00[i] = (1.0 - rho) * (1.0 - cdf[i]);
-        }
-
-        // set up iteration
-        double err = 1;
-        int it = 0;
-        double[] P0 = P00;
-
-        // perform FFT
-        double[] ft = padReal(pdf);
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
-
-        // iterate
-        while (err > 1e-12 && it < maxit) {
-
-            // square
-            double[] y = new double[n];
-            for (int i = 0; i < n; i++) {
-                y[i] = P0[i] * P0[i];
-            }
-
-            // partially convolve
-            double[] I = convolveFFT(Ft, y, n, dx);
-
-            // sum
-            double[] Pi = new double[n];
-            for (int i = 0; i < n; i++) {
-                Pi[i] = P00[i] + I[i];
-            }
-
-            // compute error
-            EuclideanDistance norm = new EuclideanDistance();
-            err = norm.compute(Pi, P0);
-
-            // update
-            P0 = Pi;
-            it++;
-        }
-        // System.err.printf("Warning: max iterations reached with error: %.2f%n", err);
-        return P0;
     }
 
 

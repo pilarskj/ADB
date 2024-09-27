@@ -4,6 +4,8 @@ import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class FFTTest {
 
     @Test
@@ -61,15 +63,23 @@ public class FFTTest {
     }
 
     @Test
-    public void testCalcP0() {
+    public void testP0() {
 
         // Example input
-        double rho = 0.5;
-        double a = 2;
-        double b = 1;
-        double[] t = { 6, 4, 5, 8.2, 4.1, 9.8 };
-        double dx = 1;
-        int maxit = 5;
+        double rho = 0.6;
+        double a = 0.03;
+        double b = 570;
+        double t_or = 100;
+
+        int m = 10;
+        double[] t = new double[m];
+        double dx = t_or / (m - 1);
+        for (int i = 0; i < m; i++) {
+            t[i] = dx * i;
+        }
+        assert t[m - 1] == t_or;
+
+        int maxit = 100;
 
         double[] result = GammaBranchingModel.calcP0(rho, a, b, t, dx, maxit);
 
@@ -97,7 +107,7 @@ public class FFTTest {
         double [] int_e = { 11, 11 };
         double [] ext_e = { 5, 5, 8, 8 };
         // computational options
-        int m = 1024;
+        int m = (int)Math.pow(2, 14);
         int maxit = 100;
 
         /*
@@ -108,7 +118,9 @@ public class FFTTest {
         */
 
         double logL = GammaBranchingModel.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
-        System.out.println(logL); // not correct: returns -15.92724, should return -24.80904
+        System.out.println(logL);
+
+        assertEquals(logL, -25.8506,  0.05);
     }
 }
 
