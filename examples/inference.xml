@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beast version="2.0">
+
+<map name="Uniform" >beast.base.inference.distribution.Uniform</map>
+<map name="Exponential" >beast.base.inference.distribution.Exponential</map>
+<map name="LogNormal" >beast.base.inference.distribution.LogNormalDistributionModel</map>
+<map name="Normal" >beast.base.inference.distribution.Normal</map>
+<map name="Beta" >beast.base.inference.distribution.Beta</map>
+<map name="Gamma" >beast.base.inference.distribution.Gamma</map>
+<map name="LaplaceDistribution" >beast.base.inference.distribution.LaplaceDistribution</map>
+<map name="prior" >beast.base.inference.distribution.Prior</map>
+<map name="InverseGamma" >beast.base.inference.distribution.InverseGamma</map>
+<map name="OneOnX" >beast.base.inference.distribution.OneOnX</map>
+
+
+<!-- input data -->
+<data id="alignment" spec="feast.fileio.AlignmentFromNexus" name="alignment" fileName="examples/barcodes.nexus">
+  <userDataType spec="tidetree.evolution.datatype.EditData" nrOfStates="52"/>
+</data>
+
+<!-- define set of cells based on alignment -->
+<taxa id="taxonSet" spec="beast.base.evolution.alignment.TaxonSet">
+    <alignment idref="alignment"/>
+</taxa>
+
+<!-- specify tip dates -->
+<traitSet id="dateTrait" spec="beast.base.evolution.tree.TraitSet"
+  taxa="@taxonSet" traitname="date-forward" value="1=15"/>
+
+
+<!-- run MCMC -->
+<run id="mcmc" spec="beast.base.inference.MCMC" chainLength="100000000" numInitializationAttempts="100">
+
+  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule"/>
+
+  <!-- 1. define state node -->
+  <state id="state" spec="beast.base.inference.State" storeEvery="5000">
+
+    <!-- fix true tree -->
+    <stateNode id="tree" spec="feast.fileio.TreeFromNewickFile" fileName="examples/tree.newick"
+               IsLabelledNewick="true" adjustTipHeights="false">
+      <taxonset idref="taxonSet"/>
+      <trait idref="dateTrait"/>
+    </stateNode>
+
+    <!-- build starting tree
+    <stateNode id="tree" spec="tidetree.tree.StartingTree"
+      rootHeight="15" taxa="@alignment" editHeight="15" editDuration="15" sequencesAreClustered="false">
+      <taxonset idref="taxonSet"/>
+      <trait idref="dateTrait"/>
+    </stateNode>  -->
+
+    <!-- editing model parameters -->
+    <parameter id="scarringProbs" spec="beast.base.inference.parameter.RealParameter"
+      dimension="1" lower="0.0" name="stateNode" upper="10">
+      0.0021 0.0078 0.0812 0.0105 0.0039 0.0309 0.0025 0.0513 0.0021 0.0731
+      0.0441 0.0038 0.0195 0.0455 0.0072 0.0210 0.0136 0.0116 0.0065 0.0014
+      0.0225 0.0056 0.0067 0.0370 0.0189 0.0281 0.0070 0.0132 0.0002 0.0099
+      0.0397 0.0190 0.0099 0.0017 0.0160 0.0359 0.0001 0.0063 0.0006 0.0494
+      0.0396 0.0027 0.0148 0.0391 0.0421 0.0360 0.0032 0.0242 0.0004 0.0306
+    </parameter>
+
+    <parameter id="lossRate" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" dimension="1" lower="0.0" upper="10" value="0"/>
+
+    <parameter id="editRate" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" dimension="1" lower="0.0" upper="10" value="0.01"/>
+
+    <!-- population process parameters -->
+    <parameter id="scale" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" dimension="1" lower="0" upper="Infinity" value="1"/>
+
+    <parameter id="shape" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" dimension="1" lower="0" upper="Infinity" value="1"/>
+
+    <parameter id="rho" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" lower="0" upper="1" value="0.9"/> <!-- fix rho for now -->
+
+    <!-- fix origin to experiment duration -->
+    <parameter id="origin" spec="beast.base.inference.parameter.RealParameter"
+               name="stateNode" lower="0" upper="Infinity" value="15"/>
+
+  </state>
+
+
+  <!-- for initialization repeats
+  <init spec="feast.parameter.InitRandomRealParameter" initial="@editRate">
+      <Uniform name="distr" lower="0" upper="0.25"/>
+  </init>  -->
+
+
+  <!-- 2. define distributions -->
+  <distribution id="posterior" spec="beast.base.inference.CompoundDistribution">
+
+    <!-- PRIORS -->
+    <distribution id="prior" spec="beast.base.inference.CompoundDistribution" useThreads='true'>
+
+      <!-- tree prior -->
+      <distribution id="GammaBranchingModel" spec="adbp.GammaBranchingModel"
+        tree="@tree" origin="@origin" scale="@scale" shape="@shape" rho="@rho" >
+      </distribution>
+
+      <!-- prior on substitution model parameters -->
+      <prior id="editRatePrior" name="distribution" x="@editRate">
+        <LogNormal id="editLogNormal" name="distr" M="-3" S="1"/></prior> <!-- [0.01, 0.26] -->
+
+      <!-- prior on phylodynamic parameters -->
+      <prior id="scalePrior" name="distribution" x="@scale">
+        <LogNormal id="scaleLogNormal" name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
+
+      <prior id="shapePrior" name="distribution" x="@shape">
+        <LogNormal id="shapeLogNormal" name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
+
+      <prior id="rhoPrior" name="distribution" x="@rho">
+        <Uniform id="rhoUniform" name="distr" lower="0" upper="1"/></prior>
+
+    </distribution>
+
+    <!-- tree likelihood -->
+    <distribution id="likelihood" spec="beast.base.inference.CompoundDistribution" useThreads='true'>
+
+      <distribution id="treeLikelihood" spec="tidetree.distributions.TreeLikelihoodWithEditWindow"
+        data="@alignment" tree="@tree" origin="@origin">
+
+        <siteModel spec="beast.base.evolution.sitemodel.SiteModel">
+          <mutationRate idref="editRate"/>
+          <parameter name="proportionInvariant" spec="beast.base.inference.parameter.RealParameter"
+            estimate="false" lower="0.0" upper="1.0" value="0.0"/>
+          <substModel id="scarringModel" spec="tidetree.substitutionmodel.EditAndSilencingModel"
+            editRates="@scarringProbs" silencingRate="@lossRate"
+            editHeight="40" editDuration="40">
+            <frequencies spec="beast.base.evolution.substitutionmodel.Frequencies" frequencies="1.0 0 0" estimate="false"/>
+          </substModel>
+        </siteModel>
+
+        <branchRateModel spec="beast.base.evolution.branchratemodel.StrictClockModel" clock.rate="1.0"/>
+      </distribution>
+    </distribution>
+  </distribution>
+
+
+  <!-- 3. define operators-->
+  <!-- tree operators
+  <operator spec="beast.base.evolution.operator.WilsonBalding" tree="@tree" weight="30.0"/>
+  <operator spec="beast.base.evolution.operator.Uniform" tree="@tree" weight="30.0"/>
+  <operator spec="beast.base.evolution.operator.SubtreeSlide" tree="@tree" weight="3.0"/>
+  <operator spec="beast.base.evolution.operator.Exchange" isNarrow="false" tree="@tree" weight="30.0"/>
+  <operator spec="beast.base.evolution.operator.ScaleOperator" rootOnly="true" tree="@tree" weight="3.0"/>  -->
+
+  <!-- substitution model operators -->
+  <operator id="editRateScaler" spec="feast.operators.SmartScaleOperator"
+    parameter="@editRate" scaleFactor="0.8" weight="3.0"/>
+
+  <!-- phylodynamic operators -->
+  <operator id="scaleScaler" spec="feast.operators.SmartScaleOperator"
+    parameter="@scale" scaleFactor="0.8" weight="3.0"/>
+  <operator id="shapeScaler" spec="feast.operators.SmartScaleOperator"
+    parameter="@shape" scaleFactor="0.8" weight="3.0"/>
+  <!-- <operator id="rhoScaler" spec="feast.operators.SmartScaleOperator"
+            parameter="@rho" scaleFactor="0.8" weight="3.0"/> -->
+
+  <!-- 4. define loggers -->
+  <!-- trace logger -->
+  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="examples/inference.log" logEvery="5000">
+    <log idref="posterior"/>
+    <log idref="likelihood"/>
+    <log idref="prior"/>
+
+    <!-- tree parameter logger -->
+    <log idref="treeLikelihood"/>
+    <log id="treeStats" spec="beast.base.evolution.tree.TreeStatLogger" tree="@tree"/>
+
+    <!-- substitution and phylodynamic parameter logger -->
+    <log idref="editRate" />
+    <log idref="scale"/>
+    <log idref="shape"/>
+    <!-- <log idref="rho"/> -->
+  </logger>
+
+  <!-- screen logger -->
+  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="100">
+    <log idref="posterior"/>
+    <log id="ESS" spec="beast.base.inference.util.ESS" arg="@posterior"/>
+    <log idref="likelihood"/>
+    <log idref="prior"/>
+  </logger>
+
+  <!-- tree logger
+  <logger id="treelog" spec="beast.base.inference.Logger" fileName="$(outDir)/$(tree)_$(seed).inference.trees" logEvery="5000" mode="tree">
+    <log idref="tree" printMetaData="true"/>
+  </logger>  -->
+
+</run>
+
+</beast>

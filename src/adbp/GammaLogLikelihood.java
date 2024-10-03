@@ -9,6 +9,8 @@ import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
+import java.util.stream.IntStream;
+
 import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
 
 
@@ -194,91 +196,95 @@ public class GammaLogLikelihood {
 
     // Function for calculating branch probabilities
     public static double[] calcB(double a, double b,
-                                    double[] s, double[] e, double[] t0, double[] P0,
-                                    int m, int maxit) {
+                                 double[] s, double[] e, double[] t0, double[] P0,
+                                 int m, int maxit) {
 
         // get number of branches
-        assert s.length == e.length;
+        assert s.length == e.length; // for each branch, a start and end time must be given
         int n = s.length;
 
         double[] B = new double[n];
         // for each branch:
-        for (int x = 0; x < n; x++) {
-            double sx = s[x]; // start of the branch
-            double ex = e[x]; // end of the branch
+        // for (int x = 0; x < n; x++) { ... }
+        // use Stream for parallelization
+        IntStream.range(0, n)
+                .parallel()
+                .forEach(x -> {
+                    double sx = s[x]; // start of the branch
+                    double ex = e[x]; // end of the branch
 
-            // generate linearly spaced values between start and end
-            double[] t_seq = new double[m];
-            double[] age_seq = new double[m];
-            double dx = (ex - sx) / (m - 1);
-            for (int i = 0; i < m; i++) {
-                t_seq[i] = sx + dx * i;
-                age_seq[i] = t_seq[i] - sx;
-            }
-            assert t_seq[m - 1] == ex;
+                    // generate linearly spaced values between start and end
+                    double[] t_seq = new double[m];
+                    double[] age_seq = new double[m];
+                    double dx = (ex - sx) / (m - 1);
+                    for (int i = 0; i < m; i++) {
+                        t_seq[i] = sx + dx * i;
+                        age_seq[i] = t_seq[i] - sx;
+                    }
+                    assert t_seq[m - 1] == ex;
 
-            // calculate the PDF of the gamma distribution
-            double[] pdf = new double[m];
-            GammaDistribution gammaDist = new GammaDistribution(b, a);
-            for (int i = 0; i < m; i++) {
-                pdf[i] = gammaDist.density(age_seq[i]);
-            }
+                    // calculate the PDF of the gamma distribution
+                    double[] pdf = new double[m];
+                    GammaDistribution gammaDist = new GammaDistribution(b, a);
+                    for (int i = 0; i < m; i++) {
+                        pdf[i] = gammaDist.density(age_seq[i]);
+                    }
 
-            // interpolate P0
-            LinearInterpolator interpolator = new LinearInterpolator();
-            UnivariateFunction function = interpolator.interpolate(t0, P0);
-            double[] P = new double[m];
-            for (int i = 0; i < m; i++) {
-                P[i] = function.value(t_seq[i]);
-            }
+                    // interpolate P0
+                    LinearInterpolator interpolator = new LinearInterpolator();
+                    UnivariateFunction function = interpolator.interpolate(t0, P0);
+                    double[] P = new double[m];
+                    for (int i = 0; i < m; i++) {
+                        P[i] = function.value(t_seq[i]);
+                    }
 
-            // initialize
-            double[] X0 = pdf;
+                    // initialize
+                    double[] X0 = pdf;
 
-            // set up iteration
-            double err = 1;
-            int it = 0;
-            double[] X = X0;
+                    // set up iteration
+                    double err = 1;
+                    int it = 0;
+                    double[] X = X0;
 
-            // perform FFT
-            double[] ft = padReal(pdf);
-            FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-            Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+                    // perform FFT
+                    double[] ft = padReal(pdf);
+                    FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+                    Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
 
-            // iterate
-            while (err > 1e-12 && it < maxit) {
+                    // iterate
+                    while (err > 1e-12 && it < maxit) {
 
-                // multiply
-                double[] y = new double[m];
-                for (int i = 0; i < m; i++) {
-                    y[i] = P[i] * X[i];
-                }
+                        // multiply
+                        double[] y = new double[m];
+                        for (int i = 0; i < m; i++) {
+                            y[i] = P[i] * X[i];
+                        }
 
-                // partially convolve
-                double[] I = convolveFFT(Ft, y, m, dx);
+                        // partially convolve
+                        double[] I = convolveFFT(Ft, y, m, dx);
 
-                // sum
-                double[] Xi = new double[m];
-                for (int i = 0; i < m; i++) {
-                    Xi[i] = X0[i] + 2 * I[i];
-                }
+                        // sum
+                        double[] Xi = new double[m];
+                        for (int i = 0; i < m; i++) {
+                            Xi[i] = X0[i] + 2 * I[i];
+                        }
 
-                // compute error
-                EuclideanDistance norm = new EuclideanDistance();
-                err = norm.compute(X, Xi);
+                        // compute error
+                        EuclideanDistance norm = new EuclideanDistance();
+                        err = norm.compute(X, Xi);
 
-                // update
-                X = Xi;
-                it++;
-            }
+                        // update
+                        X = Xi;
+                        it++;
+                    }
 
-            if (it == maxit) {
-                System.err.printf("calcB Warning: max iterations reached with error: %.2f%n", err);
-            }
+                    if (it == maxit) {
+                        System.err.printf("calcB branch %d Warning: max iterations reached with error: %.2f%n", x, err);
+                    }
 
-            // take last element
-            B[x] = X[m - 1];
-        }
+                    // take last element
+                    B[x] = X[m - 1];
+                });
 
         return B;
     }
