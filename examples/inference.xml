@@ -156,12 +156,12 @@
     parameter="@scale" scaleFactor="0.8" weight="3.0"/>
   <operator id="shapeScaler" spec="feast.operators.SmartScaleOperator"
     parameter="@shape" scaleFactor="0.8" weight="3.0"/>
-  <!-- <operator id="rhoScaler" spec="feast.operators.SmartScaleOperator"
-            parameter="@rho" scaleFactor="0.8" weight="3.0"/> -->
+  <operator id="rhoScaler" spec="feast.operators.SmartScaleOperator"
+    parameter="@rho" scaleFactor="0.8" weight="3.0"/>
 
   <!-- 4. define loggers -->
   <!-- trace logger -->
-  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="examples/inference.log" logEvery="5000">
+  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="examples/inference.log" logEvery="1000">
     <log idref="posterior"/>
     <log idref="likelihood"/>
     <log idref="prior"/>
@@ -174,11 +174,11 @@
     <log idref="editRate" />
     <log idref="scale"/>
     <log idref="shape"/>
-    <!-- <log idref="rho"/> -->
+    <log idref="rho"/>
   </logger>
 
   <!-- screen logger -->
-  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="100">
+  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="10">
     <log idref="posterior"/>
     <log id="ESS" spec="beast.base.inference.util.ESS" arg="@posterior"/>
     <log idref="likelihood"/>
