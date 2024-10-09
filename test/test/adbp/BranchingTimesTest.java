@@ -1,10 +1,14 @@
 package test.adbp;
 
+import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.evolution.tree.TreeIntervals;
 import beast.base.evolution.tree.Node;
 
+import feast.fileio.TreeFromNewickFile;
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
 
 
 public class BranchingTimesTest {
@@ -36,7 +40,7 @@ public class BranchingTimesTest {
 
     @Test
     public void testBranchingTimes() {
-
+        /*
         // Define tree
         String newick = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;";
 
@@ -45,23 +49,36 @@ public class BranchingTimesTest {
         tree.initByName("IsLabelledNewick", true,
                 "newick", newick,
                 "adjustTipHeights", false);
+        */
 
-        // Traverse all nodes and compute start/end times of all edges (backwards in time)
+        // get tree with 150 tips
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "examples/tree.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        double t_or = 15;
+
+        // traverse all nodes and compute start/end times of all branches (backwards in time)
         for (int i = 0; i < tree.getNodeCount(); i++) {
             Node node = tree.getNode(i);
 
-            // Start time is the node height (or divergence time of the node)
+            // start time is the node height (or divergence time of the node)
             double startTime = node.getHeight();
 
-            if (!node.isRoot()) {
-                // End time is the parent node height (i.e., the divergence time of the parent)
-                double endTime = node.getParent().getHeight();
+            double endTime;
+            if (node.isRoot()) {
+                // end time is the tree origin
+                endTime = t_or;
+            } else {
+                // end time is the parent node height (i.e., the divergence time of the parent)
+                endTime = node.getParent().getHeight();
+            }
 
-                if (node.isLeaf()) {
-                    System.out.println("External edge (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
-                } else {
-                    System.out.println("Internal edge (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
-                } // correct!
+            if (node.isLeaf()) {
+                System.out.println(i + " External edge (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
+            } else {
+                System.out.println(i + " Internal edge (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
             }
         }
     }

@@ -20,7 +20,7 @@ public class GammaLogLikelihood {
                                            double t_or, double[] int_s, double[] int_e, double[] ext_e,
                                            int m, int maxit) {
 
-
+        // m must be a power of 2 (required by FFT!)
         // generate linearly spaced values between 0 and origin
         double[] t_seq = new double[m];
         double dx = t_or / (m - 1);
@@ -37,6 +37,13 @@ public class GammaLogLikelihood {
 
         // calculate probabilities of internal branches
         double[] B = calcB(a, b, int_s, int_e, t_seq, P0, m, maxit);
+
+        /*
+        double logP0 = 0;
+        for (int i = 0; i < P0.length; i++) {
+            logP0 += Math.log(P0[i]);
+        }
+        */
 
         // make log and sum
         double logP1 = 0;
@@ -81,9 +88,9 @@ public class GammaLogLikelihood {
         double[] X = X0;
 
         // perform FFT
-        double[] ft = padReal(pdf);
+        double[] ft = padZeros(pdf);
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+        Complex[] Ft = fft.transform(ft, TransformType.FORWARD);
 
         // iterate
         while (err > 1e-12 && it < maxit) {
@@ -147,9 +154,9 @@ public class GammaLogLikelihood {
         double[] X = X0;
 
         // perform FFT
-        double[] ft = padReal(pdf);
+        double[] ft = padZeros(pdf);
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+        Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
 
         // iterate
         while (err > 1e-12 && it < maxit) {
@@ -247,9 +254,9 @@ public class GammaLogLikelihood {
                     double[] X = X0;
 
                     // perform FFT
-                    double[] ft = padReal(pdf);
+                    double[] ft = padZeros(pdf);
                     FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-                    Complex [] Ft = fft.transform(convertToComplex(ft), TransformType.FORWARD);
+                    Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
 
                     // iterate
                     while (err > 1e-12 && it < maxit) {
@@ -294,7 +301,7 @@ public class GammaLogLikelihood {
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
         // pad y
-        double[] y_ext = padReal(y);
+        double[] y_ext = padZeros(y);
 
         // perform FFT on y_ext
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
@@ -306,11 +313,8 @@ public class GammaLogLikelihood {
             fz[i] = fx[i].multiply(fy[i]);
         }
 
-        // pad fz
-        Complex [] fz_ext = padComplex(fz);
-
         // perform inverse FFT to get the result back in time domain
-        Complex[] z = fft.transform(fz_ext, TransformType.INVERSE);
+        Complex[] z = fft.transform(fz, TransformType.INVERSE);
 
         // extract the real part and scale it by eps
         double[] z_real = new double[n];
@@ -321,7 +325,17 @@ public class GammaLogLikelihood {
         return z_real;
     }
 
+    private static double[] padZeros(double[] x) {
+        int n = x.length;
 
+        // extend x
+        double[] xp = new double[n * 2];
+        System.arraycopy(x, 0, xp, 0, n);
+
+        return xp;
+    }
+
+    /*
     // Function for padding a real vector with 0 such that the length is a power of 2
     private static double[] padReal(double[] x) {
         int n = x.length;
@@ -338,7 +352,6 @@ public class GammaLogLikelihood {
 
         return xp;
     }
-
 
     // Function for padding a complex vector with 0 such that the length is a power of 2
     private static Complex[] padComplex(Complex[] x) {
@@ -359,4 +372,9 @@ public class GammaLogLikelihood {
 
         return xp;
     }
+    */
 }
+
+
+
+
