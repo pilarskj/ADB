@@ -16,7 +16,7 @@ import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
 
 public class GammaLogLikelihood {
 
-    public static double calcLogLikelihood(double rho, double a, double b,
+    public static double calcLogLikelihood(double rho, double a, double b, double d,
                                            double t_or, double[] int_s, double[] int_e, double[] ext_e,
                                            int m, int maxit) {
 
@@ -30,13 +30,13 @@ public class GammaLogLikelihood {
         assert t_seq[m - 1] == t_or;
 
         // calculate extinction probability over time
-        double[] P0 = calcP0(rho, a, b, t_seq, dx, maxit);
+        double[] P0 = calcP0(rho, a, b, d, t_seq, dx, maxit);
 
         // calculate probability of single descendants at tips
-        double[] P1 = calcP1(rho, a, b, ext_e, t_seq, P0, dx, maxit);
+        double[] P1 = calcP1(rho, a, b, d, ext_e, t_seq, P0, dx, maxit);
 
         // calculate probabilities of internal branches
-        double[] B = calcB(a, b, int_s, int_e, t_seq, P0, m, maxit);
+        double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
 
         /*
         double logP0 = 0;
@@ -62,7 +62,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the extinction probability
-    public static double[] calcP0(double rho, double a, double b, double[] t, double dx, int maxit) {
+    public static double[] calcP0(double rho, double a, double b, double d, double[] t, double dx, int maxit) {
 
         // get length
         int n = t.length;
@@ -79,7 +79,7 @@ public class GammaLogLikelihood {
         // initialize
         double[] X0 = new double[n];
         for (int i = 0; i < n; i++) {
-            X0[i] = (1 - rho) * (1 - cdf[i]);
+            X0[i] = (1 - rho) * (1 - cdf[i]) + d * cdf[i];
         }
 
         // set up iteration
@@ -107,7 +107,7 @@ public class GammaLogLikelihood {
             // sum
             double[] Xi = new double[n];
             for (int i = 0; i < n; i++) {
-                Xi[i] = X0[i] + I[i];
+                Xi[i] = X0[i] + (1 - d) * I[i];
             }
 
             // compute error
@@ -128,7 +128,8 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    public static double[] calcP1(double rho, double a, double b, double[] t, double[] t0, double[] P0, double dx, int maxit) {
+    public static double[] calcP1(double rho, double a, double b, double d,
+                                  double[] t, double[] t0, double[] P0, double dx, int maxit) {
 
         // get length
         int n = t0.length;
@@ -173,7 +174,7 @@ public class GammaLogLikelihood {
             // sum
             double[] Xi = new double[n];
             for (int i = 0; i < n; i++) {
-                Xi[i] = X0[i] + 2 * I[i];
+                Xi[i] = X0[i] + 2 * (1 - d) * I[i];
             }
 
             // compute error
@@ -202,7 +203,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating branch probabilities
-    public static double[] calcB(double a, double b,
+    public static double[] calcB(double a, double b, double d,
                                  double[] s, double[] e, double[] t0, double[] P0,
                                  int m, int maxit) {
 
@@ -246,7 +247,10 @@ public class GammaLogLikelihood {
                     }
 
                     // initialize
-                    double[] X0 = pdf;
+                    double[] X0 = new double[m];
+                    for (int i = 0; i < m; i++) {
+                        X0[i] = (1 - d) * pdf[i];
+                    }
 
                     // set up iteration
                     double err = 1;
@@ -273,7 +277,7 @@ public class GammaLogLikelihood {
                         // sum
                         double[] Xi = new double[m];
                         for (int i = 0; i < m; i++) {
-                            Xi[i] = X0[i] + 2 * I[i];
+                            Xi[i] = X0[i] + 2 * (1 - d) * I[i];
                         }
 
                         // compute error
@@ -324,6 +328,7 @@ public class GammaLogLikelihood {
 
         return z_real;
     }
+
 
     private static double[] padZeros(double[] x) {
         int n = x.length;

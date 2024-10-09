@@ -72,6 +72,7 @@ public class GammaLogLikelihoodTest {
         double rho = 0.6;
         double a = 0.03;
         double b = 570;
+        double d = 0.01;
         double t_or = 100;
 
         int m = 10;
@@ -84,7 +85,7 @@ public class GammaLogLikelihoodTest {
 
         int maxit = 100;
 
-        double[] result = GammaLogLikelihood.calcP0(rho, a, b, t, dx, maxit);
+        double[] result = GammaLogLikelihood.calcP0(rho, a, b, d, t, dx, maxit);
 
         for (double value : result) {
             System.out.println(value);
@@ -104,6 +105,7 @@ public class GammaLogLikelihoodTest {
         double rho = 0.1;
         double a = 1;
         double b = 1;
+        double d = 0;
         double t_or = 12;
         // branch lengths
         double [] int_s = { 5, 8, 11 };
@@ -113,7 +115,7 @@ public class GammaLogLikelihoodTest {
         int m = (int)Math.pow(2, 14);
         int maxit = 100;
 
-        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
+        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, d, t_or, int_s, int_e, ext_e, m, maxit);
         System.out.println(logL);
 
         // assertEquals(logL, -25.8506,  0.05);

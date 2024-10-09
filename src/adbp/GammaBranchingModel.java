@@ -16,6 +16,8 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("scale", "scale parameter of the Gamma distribution", Input.Validate.REQUIRED);
     final public Input<RealParameter> shapeParameterInput =
             new Input<>("shape", "shape parameter of the Gamma distribution");
+    final public Input<RealParameter> deathParameterInput =
+            new Input<>("deathprob", "probability of death at branching times");
     final public Input<RealParameter> rhoParameterInput =
             new Input<>("rho", "sampling probability at the end of the process");
     final public Input<RealParameter> originParameterInput =
@@ -37,14 +39,15 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
         double a = scaleParameterInput.get().getValue();
         double b = shapeParameterInput.get().getValue();
+        double d = deathParameterInput.get().getValue();
         double rho = rhoParameterInput.get().getValue();
         double t_or = originParameterInput.get().getValue();
 
-        return calculateTreeLogLikelihood(tree, a, b, rho, t_or);
+        return calculateTreeLogLikelihood(tree, a, b, d, rho, t_or);
     }
 
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
-                                                final double a, final double b, final double rho,
+                                                final double a, final double b, final double d, final double rho,
                                                 final double t_or) {
 
         // stop if tree origin is smaller than root height
@@ -91,7 +94,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         }
 
         // calculate LogLikelihood
-        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, t_or, int_s, int_e, ext_e, m, maxit);
+        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, d, t_or, int_s, int_e, ext_e, m, maxit);
         return logL;
     }
 
@@ -100,6 +103,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         return super.requiresRecalculation()
                 || scaleParameterInput.get().somethingIsDirty()
                 || shapeParameterInput.get().somethingIsDirty()
+                || deathParameterInput.get().somethingIsDirty()
                 || rhoParameterInput.get().somethingIsDirty()
                 || originParameterInput.get().somethingIsDirty();
     }

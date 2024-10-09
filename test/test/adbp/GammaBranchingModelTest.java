@@ -34,6 +34,7 @@ public class GammaBranchingModelTest {
         // set parameters
         model.setInputValue("scale", new RealParameter("3")); //1
         model.setInputValue("shape", new RealParameter("1"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.9")); //0.1
         model.setInputValue("origin", new RealParameter("15")); //12
 
@@ -68,6 +69,7 @@ public class GammaBranchingModelTest {
 
         // set parameters
         model.setInputValue("shape", new RealParameter("1"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.6"));
         model.setInputValue("origin", new RealParameter("15"));
 
