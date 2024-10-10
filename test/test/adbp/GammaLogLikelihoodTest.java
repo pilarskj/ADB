@@ -7,6 +7,8 @@ import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GammaLogLikelihoodTest {
@@ -71,25 +73,23 @@ public class GammaLogLikelihoodTest {
         // Example input
         double rho = 0.6;
         double a = 0.03;
-        double b = 570;
+        double b = 0.5;//570;
         double d = 0.01;
         double t_or = 100;
 
-        int m = 10;
+        int m = (int)Math.pow(2, 14);//16;
         double[] t = new double[m];
-        double dx = t_or / (m - 1);
+        double dx = t_or / m; //m-1
         for (int i = 0; i < m; i++) {
-            t[i] = dx * i;
+            t[i] = dx * (i + 1); //i
         }
         assert t[m - 1] == t_or;
+        //System.out.println("t: " + Arrays.toString(t));
 
         int maxit = 100;
 
         double[] result = GammaLogLikelihood.calcP0(rho, a, b, d, t, dx, maxit);
-
-        for (double value : result) {
-            System.out.println(value);
-        }
+        System.out.println("P0: " + Arrays.toString(result));
     }
 
     @Test

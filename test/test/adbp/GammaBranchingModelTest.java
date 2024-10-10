@@ -68,18 +68,18 @@ public class GammaBranchingModelTest {
         model.setInputValue("tree", tree);
 
         // set parameters
-        model.setInputValue("shape", new RealParameter("1"));
+        model.setInputValue("scale", new RealParameter("3"));
         model.setInputValue("deathprob", new RealParameter("0.1"));
-        model.setInputValue("rho", new RealParameter("0.6"));
+        model.setInputValue("rho", new RealParameter("0.9"));
         model.setInputValue("origin", new RealParameter("15"));
 
         // loop over different scales
-        double start = 1;
-        double end = 10;
-        double step = 0.5;
+        double start = 0.1;
+        double end = 5;
+        double step = 0.1;
         FileWriter writer = new FileWriter("examples/logL.txt");
         for (double i = start; i <= end; i += step) {
-            model.setInputValue("scale", new RealParameter(Double.toString(i)));
+            model.setInputValue("shape", new RealParameter(Double.toString(i)));
             model.initAndValidate();
             double logL = model.calculateTreeLogLikelihood(tree);
             writer.write(Double.toString(logL));

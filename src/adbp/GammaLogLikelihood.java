@@ -9,6 +9,7 @@ import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
+import java.util.Arrays;
 import java.util.stream.IntStream;
 
 import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
@@ -23,9 +24,9 @@ public class GammaLogLikelihood {
         // m must be a power of 2 (required by FFT!)
         // generate linearly spaced values between 0 and origin
         double[] t_seq = new double[m];
-        double dx = t_or / (m - 1);
+        double dx = t_or / m; // (m - 1)
         for (int i = 0; i < m; i++) {
-            t_seq[i] = dx * i;
+            t_seq[i] = dx * (i + 1); // i
         }
         assert t_seq[m - 1] == t_or;
 
@@ -37,13 +38,6 @@ public class GammaLogLikelihood {
 
         // calculate probabilities of internal branches
         double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
-
-        /*
-        double logP0 = 0;
-        for (int i = 0; i < P0.length; i++) {
-            logP0 += Math.log(P0[i]);
-        }
-        */
 
         // make log and sum
         double logP1 = 0;
@@ -89,6 +83,8 @@ public class GammaLogLikelihood {
 
         // perform FFT
         double[] ft = padZeros(pdf);
+        //System.out.println("ft: " + Arrays.toString(ft));
+
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] Ft = fft.transform(ft, TransformType.FORWARD);
 
@@ -197,7 +193,7 @@ public class GammaLogLikelihood {
         for (int i = 0; i < t.length; i++) {
             P1[i] = function.value(t[i]);
         }
-
+        //System.out.println("P1: " + Arrays.toString(P1));
         return P1;
     }
 
@@ -224,9 +220,9 @@ public class GammaLogLikelihood {
                     // generate linearly spaced values between start and end
                     double[] t_seq = new double[m];
                     double[] age_seq = new double[m];
-                    double dx = (ex - sx) / (m - 1);
+                    double dx = (ex - sx) / m; // (m - 1)
                     for (int i = 0; i < m; i++) {
-                        t_seq[i] = sx + dx * i;
+                        t_seq[i] = sx + dx * (i + 1); // i
                         age_seq[i] = t_seq[i] - sx;
                     }
                     assert t_seq[m - 1] == ex;
@@ -303,28 +299,34 @@ public class GammaLogLikelihood {
 
     // Function for partial convolution using FFT
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+        //System.out.println("fx: " + Arrays.toString(fx));
 
         // pad y
         double[] y_ext = padZeros(y);
+        //System.out.println("y_ext: " + Arrays.toString(y_ext));
 
         // perform FFT on y_ext
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] fy = fft.transform(y_ext, TransformType.FORWARD);
+        //System.out.println("fy: " + Arrays.toString(fy));
 
         // element-wise multiplication of fx and fy (convolution in Fourier space)
         Complex[] fz = new Complex[fx.length];
         for (int i = 0; i < fx.length; i++) {
             fz[i] = fx[i].multiply(fy[i]);
         }
+        //System.out.println("fz: " + Arrays.toString(fz));
 
         // perform inverse FFT to get the result back in time domain
         Complex[] z = fft.transform(fz, TransformType.INVERSE);
+        //System.out.println("z: " + Arrays.toString(z));
 
         // extract the real part and scale it by eps
         double[] z_real = new double[n];
         for (int i = 0; i < n; i++) {
             z_real[i] = z[i].getReal() * eps;
         }
+        //System.out.println("z_real: " + Arrays.toString(z_real));
 
         return z_real;
     }
