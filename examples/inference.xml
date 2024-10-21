@@ -57,7 +57,7 @@
                name="stateNode" dimension="1" lower="0.0" upper="10" value="0"/>
 
     <parameter id="editRate" spec="beast.base.inference.parameter.RealParameter"
-               name="stateNode" dimension="1" lower="0.0" upper="10" value="0.01"/>
+               name="stateNode" dimension="1" lower="0.0" upper="10" value="0.05"/>
 
     <!-- population process parameters -->
     <parameter id="scale" spec="beast.base.inference.parameter.RealParameter"
@@ -90,10 +90,6 @@
         tree="@tree" origin="@origin" scale="@scale" shape="@shape" deathprob="@deathprob" rho="@rho" >
       </distribution>
 
-      <!-- prior on substitution model parameters -->
-      <prior id="editRatePrior" name="distribution" x="@editRate">
-        <LogNormal name="distr" M="-3" S="1"/></prior> <!-- [0.01, 0.26] -->
-
       <!-- prior on phylodynamic parameters -->
       <prior id="scalePrior" name="distribution" x="@scale">
         <LogNormal name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
@@ -102,10 +98,10 @@
         <LogNormal name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
 
       <prior id="deathprobPrior" name="distribution" x="@deathprob">
-        <Uniform name="distr" lower="0" upper="1"/></prior>
+        <Beta name="distr" alpha="2" beta="10"/></prior>
 
       <prior id="rhoPrior" name="distribution" x="@rho">
-        <Uniform name="distr" lower="0" upper="1"/></prior>
+        <Beta name="distr" alpha="10" beta="2"/></prior>
 
     </distribution>
 
@@ -121,7 +117,7 @@
             estimate="false" lower="0.0" upper="1.0" value="0.0"/>
           <substModel id="scarringModel" spec="tidetree.substitutionmodel.EditAndSilencingModel"
             editRates="@scarringProbs" silencingRate="@lossRate"
-            editHeight="40" editDuration="40">
+            editHeight="15" editDuration="15">
             <frequencies spec="beast.base.evolution.substitutionmodel.Frequencies" frequencies="1.0 0 0" estimate="false"/>
           </substModel>
         </siteModel>
@@ -140,19 +136,35 @@
   <operator spec="beast.base.evolution.operator.Exchange" isNarrow="false" tree="@tree" weight="30.0"/>
   <operator spec="beast.base.evolution.operator.ScaleOperator" rootOnly="true" tree="@tree" weight="3.0"/>  -->
 
-  <!-- substitution model operators -->
-  <operator id="editRateScaler" spec="feast.operators.SmartScaleOperator"
-    parameter="@editRate" scaleFactor="1" weight="3.0"/>
-
   <!-- phylodynamic operators -->
   <operator id="scaleScaler" spec="feast.operators.SmartScaleOperator"
-    parameter="@scale" scaleFactor="1.0" weight="3.0"/>
+            parameter="@scale" scaleFactor="0.8" weight="3.0"/>
   <operator id="shapeScaler" spec="feast.operators.SmartScaleOperator"
-    parameter="@shape" scaleFactor="1.0" weight="3.0"/>
+            parameter="@shape" scaleFactor="0.8" weight="3.0"/>
   <operator id="deathprobScaler" spec="feast.operators.SmartScaleOperator"
-    parameter="@deathprob" scaleFactor="1.0" weight="3.0"/>
+            parameter="@deathprob" scaleFactor="0.8" weight="3.0"/>
   <operator id="rhoScaler" spec="feast.operators.SmartScaleOperator"
-    parameter="@rho" scaleFactor="1.0" weight="3.0"/>
+            parameter="@rho" scaleFactor="0.8" weight="3.0"/>
+
+  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+    <up idref="scale"/>
+    <down idref="shape"/>
+  </operator>
+
+  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+    <up idref="scale"/>
+    <up idref="shape"/>
+  </operator>
+
+  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+    <up idref="deathprob"/>
+    <down idref="rho"/>
+  </operator>
+
+  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+    <up idref="deathprob"/>
+    <up idref="rho"/>
+  </operator>
 
   <!-- 4. define loggers -->
   <!-- trace logger -->
@@ -165,7 +177,6 @@
     <log idref="treeLikelihood"/>
 
     <!-- substitution and phylodynamic parameter logger -->
-    <log idref="editRate" />
     <log idref="scale"/>
     <log idref="shape"/>
     <log idref="deathprob"/>
