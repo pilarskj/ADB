@@ -9,18 +9,16 @@ import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
-import java.util.Arrays;
 import java.util.stream.IntStream;
-
-import static org.apache.commons.math3.complex.ComplexUtils.convertToComplex;
 
 
 public class GammaLogLikelihood {
 
     public static double calcLogLikelihood(double rho, double a, double b, double d,
                                            double t_or, double[] int_s, double[] int_e, double[] ext_e,
-                                           int m, int maxit) {
-
+                                           int mP, int mB, int maxit) {
+        // set large m for P0 and P1
+        int m = mP;
         // m must be a power of 2 (required by FFT!)
         // generate linearly spaced values between 0 and origin
         double[] t_seq = new double[m];
@@ -35,6 +33,9 @@ public class GammaLogLikelihood {
 
         // calculate probability of single descendants at tips
         double[] P1 = calcP1(rho, a, b, d, ext_e, t_seq, P0, dx, maxit);
+
+        // reduce m for B
+        m = mB;
 
         // calculate probabilities of internal branches
         double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
@@ -83,7 +84,6 @@ public class GammaLogLikelihood {
 
         // perform FFT
         double[] ft = padZeros(pdf);
-        //System.out.println("ft: " + Arrays.toString(ft));
 
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] Ft = fft.transform(ft, TransformType.FORWARD);
@@ -193,7 +193,6 @@ public class GammaLogLikelihood {
         for (int i = 0; i < t.length; i++) {
             P1[i] = function.value(t[i]);
         }
-        //System.out.println("P1: " + Arrays.toString(P1));
         return P1;
     }
 
@@ -203,13 +202,16 @@ public class GammaLogLikelihood {
                                  double[] s, double[] e, double[] t0, double[] P0,
                                  int m, int maxit) {
 
+        // interpolate P0
+        LinearInterpolator interpolator = new LinearInterpolator();
+        UnivariateFunction function = interpolator.interpolate(t0, P0);
+
         // get number of branches
         assert s.length == e.length; // for each branch, a start and end time must be given
         int n = s.length;
 
         double[] B = new double[n];
         // for each branch:
-        // for (int x = 0; x < n; x++) { ... }
         // use Stream for parallelization
         IntStream.range(0, n)
                 .parallel()
@@ -234,9 +236,7 @@ public class GammaLogLikelihood {
                         pdf[i] = gammaDist.density(age_seq[i]);
                     }
 
-                    // interpolate P0
-                    LinearInterpolator interpolator = new LinearInterpolator();
-                    UnivariateFunction function = interpolator.interpolate(t0, P0);
+                    // interpolate
                     double[] P = new double[m];
                     for (int i = 0; i < m; i++) {
                         P[i] = function.value(t_seq[i]);
@@ -299,34 +299,28 @@ public class GammaLogLikelihood {
 
     // Function for partial convolution using FFT
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
-        //System.out.println("fx: " + Arrays.toString(fx));
 
         // pad y
         double[] y_ext = padZeros(y);
-        //System.out.println("y_ext: " + Arrays.toString(y_ext));
 
         // perform FFT on y_ext
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] fy = fft.transform(y_ext, TransformType.FORWARD);
-        //System.out.println("fy: " + Arrays.toString(fy));
 
         // element-wise multiplication of fx and fy (convolution in Fourier space)
         Complex[] fz = new Complex[fx.length];
         for (int i = 0; i < fx.length; i++) {
             fz[i] = fx[i].multiply(fy[i]);
         }
-        //System.out.println("fz: " + Arrays.toString(fz));
 
         // perform inverse FFT to get the result back in time domain
         Complex[] z = fft.transform(fz, TransformType.INVERSE);
-        //System.out.println("z: " + Arrays.toString(z));
 
         // extract the real part and scale it by eps
         double[] z_real = new double[n];
         for (int i = 0; i < n; i++) {
             z_real[i] = z[i].getReal() * eps;
         }
-        //System.out.println("z_real: " + Arrays.toString(z_real));
 
         return z_real;
     }
@@ -342,42 +336,23 @@ public class GammaLogLikelihood {
         return xp;
     }
 
-    /*
-    // Function for padding a real vector with 0 such that the length is a power of 2
-    private static double[] padReal(double[] x) {
-        int n = x.length;
+    /* redundant calculation for P0 and P1
+    private static Complex[] getPDF(double[] t, double a, double b) {
+        int n = t.length;
 
-        // find the next power of 2 greater than or equal to n
-        int np = 1;
-        while (np < n) {
-            np *= 2;
+        // calculate the PDF of the gamma distribution
+        double[] pdf = new double[n];
+        GammaDistribution gammaDist = new GammaDistribution(b, a);
+        for (int i = 0; i < n; i++) {
+            pdf[i] = gammaDist.density(t[i]);
         }
 
-        // extend x
-        double[] xp = new double[np];
-        System.arraycopy(x, 0, xp, 0, n);
+        // perform FFT
+        double[] ft = padZeros(pdf);
+        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+        Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
 
-        return xp;
-    }
-
-    // Function for padding a complex vector with 0 such that the length is a power of 2
-    private static Complex[] padComplex(Complex[] x) {
-        int n = x.length;
-
-        // find the next power of 2 greater than or equal to n
-        int np = 1;
-        while (np < n) {
-            np *= 2;
-        }
-
-        // pad with 0
-        Complex[] xp = new Complex[np];
-        System.arraycopy(x, 0, xp, 0, n);
-        for (int i = n; i < np; i++) {
-            xp[i] = Complex.ZERO;
-        }
-
-        return xp;
+        return Ft;
     }
     */
 }

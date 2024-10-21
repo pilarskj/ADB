@@ -77,11 +77,11 @@ public class GammaLogLikelihoodTest {
         double d = 0.01;
         double t_or = 100;
 
-        int m = (int)Math.pow(2, 14);//16;
+        int m = (int)Math.pow(2, 14);
         double[] t = new double[m];
-        double dx = t_or / m; //m-1
+        double dx = t_or / m;
         for (int i = 0; i < m; i++) {
-            t[i] = dx * (i + 1); //i
+            t[i] = dx * (i + 1);
         }
         assert t[m - 1] == t_or;
         //System.out.println("t: " + Arrays.toString(t));
@@ -92,34 +92,34 @@ public class GammaLogLikelihoodTest {
         System.out.println("P0: " + Arrays.toString(result));
     }
 
+
     @Test
     public void testLogLikelihood() {
 
-        // cf. R:
-        // tree = read.tree(text = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;")
-        // times = get_tree_times(tree = tree, t_or = 11) # does not include the stem branch!
-        // (extract branches)
+        // tree = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;"
 
-        // inputs
         // phylodynamic parameters
         double rho = 0.1;
         double a = 1;
         double b = 1;
         double d = 0;
         double t_or = 12;
+
         // branch lengths
         double [] int_s = { 5, 8, 11 };
         double [] int_e = { 11, 11, 12 };
         double [] ext_e = { 5, 5, 8, 8 };
+
         // computational options
         int m = (int)Math.pow(2, 14);
         int maxit = 100;
 
-        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, d, t_or, int_s, int_e, ext_e, m, maxit);
+        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, d, t_or, int_s, int_e, ext_e, m, m, maxit);
         System.out.println(logL);
 
-        // assertEquals(logL, -25.8506,  0.05);
+        assertEquals(logL, -26.91385,  0.05);
     }
+
 }
 
 
