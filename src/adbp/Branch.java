@@ -6,31 +6,25 @@ public class Branch {
     public int endNode;
     public double startTime;
     public double endTime;
-    public String branchType;
+    public String branchMode;
     public int branchIndex;
     public int leftIndex;
     public int rightIndex;
+    public int nodeType; // type at branch end
 
-    public Branch(int startNode, int endNode, double startTime, double endTime, String branchType) {
+    public Branch(int startNode, int endNode, double startTime, double endTime, String branchMode) {
+        // assertions
+        assert branchMode.equals("internal") || branchMode.equals("external");
+        assert startTime < endTime;
+
         this.startNode = startNode;
         this.endNode = endNode;
         this.startTime = startTime;
         this.endTime = endTime;
-        this.branchType = branchType;
-        this.branchIndex = -1; // // default -1 means no index assigned
+        this.branchMode = branchMode;
+        this.branchIndex = -1; // default -1 means no index assigned
         this.leftIndex = -1; // default -1 means no children
         this.rightIndex = -1;
-    }
-
-    public void setIndex(int branchIndex) {
-        this.branchIndex = branchIndex;
-    }
-
-    public void setLeftIndex(int leftIndex) {
-        this.leftIndex = leftIndex;
-    }
-
-    public void setRightIndex(int rightIndex) {
-        this.rightIndex = rightIndex;
+        this.nodeType = -1; // default -1 means no type assigned
     }
 }

@@ -101,20 +101,19 @@ public class BranchingTimesTest {
 
         double t_or = 12;
 
-        BranchList branches = new BranchList();
-        branches.traverseTree(tree, t_or);
-        branches.assignBranchIndices();
-        branches.getChildBranches();
+        BranchList branches = new BranchList(tree, t_or);
+        branches.assignTypes(2);
 
-        for (Branch branch : branches.getBranches()) {
+        for (Branch branch : branches.listBranches()) {
+        //Branch branch = branches.getBranchByIndex(3);
             System.out.println("Branch from node " + branch.startNode + " to node " + branch.endNode);
             System.out.println("Start time: " + branch.startTime + ", End time: " + branch.endTime);
-            System.out.println("Edge index: " + branch.branchIndex);
-            System.out.println("Left downstream edge index: " + branch.leftIndex);
-            System.out.println("Right downstream edge index: " + branch.rightIndex);
-            System.out.println("Type: " + branch.branchType);
+            System.out.println("Branch index: " + branch.branchIndex + ", left: " + branch.leftIndex + ", right: " + branch.rightIndex);
+            System.out.println("Mode: " + branch.branchMode);
+            System.out.println("Node type: " + branch.nodeType);
             System.out.println();
         }
+
         /*
         // traverse all nodes and compute start/end times of all branches (backwards in time)
         for (int i = 0; i < tree.getNodeCount(); i++) {
@@ -122,6 +121,10 @@ public class BranchingTimesTest {
             System.out.println("Node Nr " + node.getNr() + ", ID " + node.getID() + ", Height " + node.getHeight()
                     + ", Left " + node.getLeft() + ", Right " + node.getRight());
         }
-        */
+         */
+
+        //System.out.println(branches.countExternalBranches());
+        //System.out.println(branches.countInternalBranches());
+
     }
 }

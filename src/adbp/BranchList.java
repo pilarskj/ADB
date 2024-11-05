@@ -7,20 +7,20 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
 
 public class BranchList {
     private List<Branch> branches;
 
-    public BranchList() {
-        this.branches = new ArrayList<>();
-    }
-
-    public List<Branch> getBranches() {
-        return branches;
+    public BranchList(TreeInterface tree, double origin) {
+        branches = new ArrayList<>();
+        traverseTree(tree, origin);
+        assignBranchIndices();
+        findChildBranches();
     }
 
     // BFS traversal method to add branches to the list
-    public void traverseTree(TreeInterface tree, double origin) {
+    private void traverseTree(TreeInterface tree, double origin) {
         Node root = tree.getRoot();
         if (root == null) {
             return;
@@ -66,37 +66,87 @@ public class BranchList {
     }
 
     // Assign branch indices
-    public void assignBranchIndices() {
+    private void assignBranchIndices() {
         int ntips = (int) branches.stream()
-                .filter(b -> b.branchType == "external")
+                .filter(b -> b.branchMode.equals("external"))
                 .count();
 
         int intIndex = 0;
         int extIndex = ntips - 1;
         for (Branch b : branches) {
-            if (b.branchType == "internal") {
-                b.setIndex(intIndex);
+            if (b.branchMode.equals("internal")) {
+                b.branchIndex = intIndex;
                 intIndex++;
-            } else if (b.branchType == "external") {
-                b.setIndex(extIndex);
+            } else if (b.branchMode.equals("external")) {
+                b.branchIndex = extIndex;
                 extIndex++;
             }
         }
     }
 
     // Identify child branches
-    public void getChildBranches() {
+    private void findChildBranches() {
         for (Branch b : branches) {
-            if (b.branchType == "internal") {
+            if (b.branchMode.equals("internal")) {
                 List<Integer> children = branches.stream()
                         .filter(x -> x.endNode == b.startNode) // Filter branches where endNode matches startNode
                         .map(x -> x.branchIndex)               // Get the index of matching branches
                         .toList();
-                b.setLeftIndex(children.get(0));
-                b.setRightIndex(children.get(1));
+                b.leftIndex = children.get(0);
+                b.rightIndex = children.get(1);
             }
         }
     }
+
+    // Get branches as List or looping
+    public List<Branch> listBranches() {
+        return branches;
+    }
+
+    // Get branch with a specific branchIndex
+    public  Branch getBranchByIndex(int i) {
+        for (Branch branch : branches) {
+            if (branch.branchIndex == i) {
+                return branch;
+            }
+        }
+        // If no branch is found with the given branchIndex, throw an exception
+        throw new IllegalArgumentException("Branch not found for index: " + i);
+    }
+
+    // Get the number of external branches
+    public int countExternalBranches() {
+        int i = 0;
+        for (Branch branch : branches) {
+            if (branch.branchMode.equals("internal")) {
+                i += 1;
+            }
+        }
+        return i;
+    }
+
+    // Get the number of internal branches
+    public int countInternalBranches() {
+        int i = 0;
+        for (Branch branch : branches) {
+            if (branch.branchMode.equals("external")) {
+                i += 1;
+            }
+        }
+        return i;
+    }
+
+
+    // Assign types (for testing)
+    public void assignTypes(int ntypes) {
+        Random random = new Random();
+        random.setSeed(12345);
+        for (Branch branch : branches) {
+            int randomType = random.nextInt(ntypes);
+            branch.nodeType = randomType;
+        }
+    }
+
 }
 
 

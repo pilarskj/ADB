@@ -16,15 +16,18 @@ public class MTLogLikelihood {
 
     public static double calcLogLikelihood(double[] a, double[] b, double[] d, double rho,
                                            double[][] Xsi_as, double[][] Xsi_s,
-                                           double t_or, int type_or,
+                                           double t_or, int[] types, //int type_or,
                                            double[] int_s, double[] int_e, double[] ext_e,
-                                           double[] left_child, double[] right_child,
+                                           int[] left_child, int[] right_child,
                                            int m, int mB, int maxit) {
 
         // get number of types
         int ntypes = a.length;
         assert b.length == ntypes;
         assert d.length == ntypes;
+
+        // get number of tips
+        int ntips = ext_e.length;
 
         // m must be a power of 2 (required by FFT!)
         // generate linearly spaced values between 0 and origin
@@ -57,8 +60,6 @@ public class MTLogLikelihood {
                     }
                 });
 
-
-
         // calculate extinction probability over time
         double[][] P0 = calcP0(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, t_seq, dx, maxit);
 
@@ -66,20 +67,69 @@ public class MTLogLikelihood {
         double[][] P1 = calcP1(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, ext_e, t_seq, P0, dx, maxit);
 
         // calculate probabilities of internal branches
-        double[][] B = calcB(a, b, d,  Xsi_as, Xsi_s, int_s, int_e, t_seq, P0, mB, maxit);
+        double[][] B = calcB(a, b, d, Xsi_as, Xsi_s, int_s, int_e, t_seq, P0, mB, maxit);
+        //System.out.println(Arrays.deepToString(B));
 
         // start recursion
-        double treeL = calcTreeLikelihood();
+        double treeL = calcLikelihoodColoured(1, ntips, 0, types[0], types,
+                left_child, right_child, Xsi_as, Xsi_s, P1, B);
+        // uncoloured (super slow)
+        //double treeL = calcLikelihoodUncoloured(1, ntips, ntypes, 0, type_or, left_child, right_child,
+        //       Xsi_as, Xsi_s, P1, B);
 
         return Math.log(treeL);
     }
 
-    // Function for calculating the extinction probability
-    public static double calcTreeLikelihood(double likelihood, int ntips, int ntypes,
-                                            int stem_index, int stem_type, int[] left_child, int[] right_child,
-                                            double[][] Xsi_as, double[][] Xsi_s,
-                                            double[][] P1, double[][] B) {
 
+    // Recursive function for calculating the tree likelihood (for a coloured tree)
+    public static double calcLikelihoodColoured(double likelihood, int ntips, int stem_index, int stem_type,
+                                                int[] types, int[] left_child, int[] right_child,
+                                                double[][] Xsi_as, double[][] Xsi_s,
+                                                double[][] P1, double[][] B) {
+
+        //System.out.println("branch " + stem_index + ", type " + stem_type);
+        // at tips
+        if (stem_index >= ntips - 1) {
+            likelihood = P1[stem_index - (ntips - 1)][stem_type];
+        } else {
+            // get subtree (new stems)
+            int right_stem = right_child[stem_index];
+            int left_stem = left_child[stem_index];
+
+            int right_type = types[right_stem];
+            int left_type = types[right_stem];
+
+            // find transition probability
+            double xsi;
+            if (right_type == left_type) {
+                xsi = Xsi_s[stem_type][right_type];
+            } else {
+                if (right_type == stem_type) {
+                    xsi = 0.5 * Xsi_as[stem_type][left_type];
+                } else if (left_type == stem_type) {
+                    xsi = 0.5 * Xsi_as[stem_type][right_type];
+                } else {
+                   xsi = 0;
+                }
+            }
+
+            // recursion
+            double subtreeL = xsi *
+                    calcLikelihoodColoured(likelihood, ntips, left_stem, left_type, types, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
+                    calcLikelihoodColoured(likelihood, ntips, right_stem, right_type, types, left_child, right_child, Xsi_as, Xsi_s, P1, B);
+
+            likelihood = B[stem_index][stem_type] * subtreeL;
+        }
+        return likelihood;
+    }
+
+
+    // Recursive function for calculating the tree likelihood (for a uncoloured tree)
+    public static double calcLikelihoodUncoloured(double likelihood, int ntips, int ntypes,
+                                                  int stem_index, int stem_type, int[] left_child, int[] right_child,
+                                                  double[][] Xsi_as, double[][] Xsi_s,
+                                                  double[][] P1, double[][] B) {
+        System.out.println(stem_index + " type " + stem_type);
         // at tips
         if (stem_index >= ntips - 1) {
             return P1[stem_index - (ntips - 1)][stem_type];
@@ -87,22 +137,25 @@ public class MTLogLikelihood {
 
             // recursion
             double subtreeL = 0;
-            for (int j=0;  j < ntypes; j++){
+            // loop over all possible types at internal nodes
+            for (int j = 0;  j < ntypes; j++){
                 // get subtree (new stems)
                 int right_stem = right_child[stem_index];
                 int left_stem = left_child[stem_index];
 
                 subtreeL += Xsi_as[stem_type][j] *
-                        calcTreeLikelihood(likelihood, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
-                        calcTreeLikelihood(likelihood, ntips, ntypes, left_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1, B) +
+                        calcLikelihoodUncoloured(likelihood, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
+                        calcLikelihoodUncoloured(likelihood, ntips, ntypes, left_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1, B) +
                         Xsi_as[stem_type][j] *
-                                calcTreeLikelihood(likelihood, ntips, ntypes, right_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
-                                calcTreeLikelihood(likelihood, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) +
+                                calcLikelihoodUncoloured(likelihood, ntips, ntypes, right_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
+                                calcLikelihoodUncoloured(likelihood, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) +
                         Xsi_s[stem_type][j] *
-                                calcTreeLikelihood(likelihood, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
-                                calcTreeLikelihood(likelihood, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B);
+                                calcLikelihoodUncoloured(likelihood, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B) *
+                                calcLikelihoodUncoloured(likelihood, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1, B);
             }
-            return B[stem_index][stem_type] * subtreeL;
+
+            likelihood = B[stem_index][stem_type] * subtreeL;
+            return likelihood;
         }
     }
 
@@ -133,30 +186,28 @@ public class MTLogLikelihood {
         while (err > 1e-12 && it < maxit) {
             double[][] Xi = new double[m][n];
 
-            IntStream.range(0, n)
-                    .parallel() // for each type j
-                    .forEach(j -> {
-                        // get vectors for convolution
-                        double[] y = new double[m];
-                        for (int i = 0; i < m; i++) { // multiply elementwise on times
-                            for (int k = 0; k < n; k++) { // sum over all types k
-                                y[i] += 2 * Xsi_as[j][k] * X[i][j] * X[i][k] + Xsi_s[j][k] * X[i][k] * X[i][k];
-                            }
-                        }
-                        // extract column from the pdf matrix
-                        Complex[] Ft = new Complex[m*2];
-                        for (int i = 0; i < m*2; i++) {
-                            Ft[i] = pdf_FFT[i][j];
-                        }
+            for (int j = 0; j < n; j++) {
+                // get vectors for convolution
+                double[] y = new double[m];
+                for (int i = 0; i < m; i++) { // multiply elementwise on times
+                    for (int k = 0; k < n; k++) { // sum over all types k
+                        y[i] += 2 * Xsi_as[j][k] * X[i][j] * X[i][k] + Xsi_s[j][k] * X[i][k] * X[i][k];
+                    }
+                }
+                // extract column from the pdf matrix
+                Complex[] Ft = new Complex[m*2];
+                for (int i = 0; i < m*2; i++) {
+                    Ft[i] = pdf_FFT[i][j];
+                }
 
-                        // partially convolve
-                        double[] I = convolveFFT(Ft, y, m, dx);
+                // partially convolve
+                double[] I = convolveFFT(Ft, y, m, dx);
 
-                        // sum
-                        for (int i = 0; i < m; i++) {
-                            Xi[i][j] = X0[i][j] + (1 - d[j]) * I[i];
-                        }
-                    });
+                // sum
+                for (int i = 0; i < m; i++) {
+                    Xi[i][j] = X0[i][j] + (1 - d[j]) * I[i];
+                }
+            };
 
             // compute error
             err = getMatrixError(X, Xi);
@@ -200,31 +251,29 @@ public class MTLogLikelihood {
         while (err > 1e-12 && it < maxit) {
             double[][] Xi = new double[m][n];
 
-            IntStream.range(0, n)
-                    .parallel() // for each type j
-                    .forEach(j -> {
-                        // get vectors for convolution
-                        double[] y = new double[m];
-                        for (int i = 0; i < m; i++) { // multiply elementwise on times
-                            for (int k = 0; k < n; k++) { // sum over all types k
-                                y[i] += 2 * Xsi_as[j][k] * (X[i][j] * P0[i][k] + X[i][k] * P0[i][j])
-                                        + Xsi_s[j][k] * X[i][k] * P0[i][k];
-                            }
-                        }
-                        // extract column from the pdf matrix
-                        Complex[] Ft = new Complex[m*2];
-                        for (int i = 0; i < m*2; i++) {
-                            Ft[i] = pdf_FFT[i][j];
-                        }
+            for (int j = 0; j < n; j++) {
+                // get vectors for convolution
+                double[] y = new double[m];
+                for (int i = 0; i < m; i++) { // multiply elementwise on times
+                    for (int k = 0; k < n; k++) { // sum over all types k
+                        y[i] += 2 * Xsi_as[j][k] * (X[i][j] * P0[i][k] + X[i][k] * P0[i][j])
+                                + Xsi_s[j][k] * X[i][k] * P0[i][k];
+                    }
+                }
+                // extract column from the pdf matrix
+                Complex[] Ft = new Complex[m*2];
+                for (int i = 0; i < m*2; i++) {
+                    Ft[i] = pdf_FFT[i][j];
+                }
 
-                        // partially convolve
-                        double[] I = convolveFFT(Ft, y, m, dx);
+                // partially convolve
+                double[] I = convolveFFT(Ft, y, m, dx);
 
-                        // sum
-                        for (int i = 0; i < m; i++) {
-                            Xi[i][j] = X0[i][j] + 2 * (1 - d[j]) * I[i];
-                        }
-                    });
+                // sum
+                for (int i = 0; i < m; i++) {
+                    Xi[i][j] = X0[i][j] + 2 * (1 - d[j]) * I[i];
+                }
+            }
 
             // compute error
             err = getMatrixError(X, Xi);
@@ -241,21 +290,20 @@ public class MTLogLikelihood {
         // interpolate: evaluate at tip times
         int ntips = t.length;
         double[][] P1 = new double[ntips][n];
-        IntStream.range(0, n)
-                .parallel() // for each type j
-                .forEach(j -> {
-                    // extract column from X
-                    double[] Xj = new double[m];
-                    for (int i = 0; i < m; i++) {
-                        Xj[i] = X[i][j];
-                    }
-                    LinearInterpolator interpolator = new LinearInterpolator();
-                    UnivariateFunction function = interpolator.interpolate(t0, Xj);
 
-                    for (int i = 0; i < ntips; i++) {
-                        P1[i][j] = function.value(t[i]);
-                    }
-                });
+        for (int j = 0; j < n; j++) {
+            // extract column from X
+            double[] Xj = new double[m];
+            for (int i = 0; i < m; i++) {
+                Xj[i] = X[i][j];
+            }
+            LinearInterpolator interpolator = new LinearInterpolator();
+            UnivariateFunction function = interpolator.interpolate(t0, Xj);
+
+            for (int i = 0; i < ntips; i++) {
+                P1[i][j] = function.value(t[i]);
+            }
+        }
 
         return P1;
     }
@@ -312,7 +360,7 @@ public class MTLogLikelihood {
 
                     for (int j = 0; j < ntypes; j++) {
                         double[] pdf = new double[m];
-                        GammaDistribution gammaDist = new GammaDistribution(b[x], a[x]);
+                        GammaDistribution gammaDist = new GammaDistribution(b[j], a[j]);
                         for (int i = 0; i < m; i++) {
                             pdf[i] = gammaDist.density(age_seq[i]); // get density
                             P[i][j] = functions.get(j).value(t_seq[i]); // interpolate P0
