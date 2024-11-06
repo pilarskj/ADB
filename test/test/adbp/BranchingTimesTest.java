@@ -2,6 +2,7 @@ package test.adbp;
 
 import adbp.Branch;
 import adbp.BranchList;
+import adbp.Simulator;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.evolution.tree.TreeIntervals;
@@ -126,5 +127,38 @@ public class BranchingTimesTest {
         //System.out.println(branches.countExternalBranches());
         //System.out.println(branches.countInternalBranches());
 
+    }
+
+    @Test
+    public void testTreeConstruction() {
+
+        double origin = 10;
+        int originType = 0;
+        double[] a = {4, 3};
+        double[] b = {1, 2};
+        double[] d = {0.2, 0.1};
+        //double rho = 0.9;
+        double[][] Xsi_as = {{0, 0.1},
+                             {0.2, 0}};
+        double[][] Xsi_s = {{0.5, 0.3},
+                            {0.1, 0.5}};
+
+        Simulator sim = new Simulator();
+        Tree tree = sim.simulate(origin, originType, a, b, d, Xsi_as, Xsi_s);
+
+        // traverse all nodes and compute start/end times of all branches (backwards in time)
+        for (int i = 0; i < tree.getNodeCount(); i++) {
+            Node node = tree.getNode(i);
+            if (node.isLeaf()) {
+                System.out.println("Node Nr " + node.getNr() + ", Type " + node.getMetaData("type") +
+                        ", Height " + node.getHeight() + ", Left " + node.getLeft() + ", Right " + node.getRight());
+            } else {
+                System.out.println("Node Nr " + node.getNr() + ", Type " + node.getMetaData("type") +
+                        ", Height " + node.getHeight() + ", Left " + node.getLeft().getNr() + ", Right " + node.getRight().getNr());
+            }
+        }
+
+        // convert to Newick format
+        System.out.println(tree.getRoot().toNewick());
     }
 }
