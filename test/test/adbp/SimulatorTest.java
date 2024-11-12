@@ -11,9 +11,9 @@ public class SimulatorTest {
     @Test
     public void testTreeSimulator() {
 
-        double origin = 10;
+        double origin = 15;
         int originType = 0;
-        double[] a = {2, 3};
+        double[] a = {1, 2};
         double[] b = {1, 2};
         double[] d = {0.2, 0.1};
         double rho = 0.5;
@@ -42,6 +42,7 @@ public class SimulatorTest {
                 }
             }
             // convert to Newick format
+            System.out.println(tree.getLeafNodeCount() + " tips");
             System.out.println(tree.getRoot().toNewick());
         }
     }
@@ -76,7 +77,7 @@ public class SimulatorTest {
         Tree prunedTree = sim.pruneTree(tree, 0.3);
 
         if (prunedTree != null) {
-            // traverse all nodes and compute start/end times of all branches (backwards in time)
+            // traverse all nodes (backwards in time)
             for (int i = 0; i < prunedTree.getNodeCount(); i++) {
                 Node node = prunedTree.getNode(i);
                 if (node.isLeaf()) {

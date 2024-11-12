@@ -9,6 +9,7 @@ import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
+import java.util.Arrays;
 import java.util.stream.IntStream;
 
 
@@ -38,7 +39,8 @@ public class GammaLogLikelihood {
         m = mB;
 
         // calculate probabilities of internal branches
-        double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
+        // double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
+        double[] B = approxB(a, b, d, int_s, int_e, t_seq, P0);
 
         // make log and sum
         double logP1 = 0;
@@ -297,6 +299,52 @@ public class GammaLogLikelihood {
     }
 
 
+
+    // Function for approximating branch probabilities
+    public static double[] approxB(double a, double b, double d,
+                                 double[] s, double[] e, double[] t0, double[] P0) {
+
+        // get number of branches
+        assert s.length == e.length; // for each branch, a start and end time must be given
+        int n = s.length;
+
+        double[] B = new double[n];
+        // for each branch:
+        // use Stream for parallelization
+        IntStream.range(0, n)
+                .parallel()
+                .forEach(x -> {
+                    double sx = s[x]; // start of the branch
+                    double ex = e[x]; // end of the branch
+
+                    // get average P0 over branch
+                    double[] P0_slice = Arrays.copyOfRange(P0, findClosestIndex(t0, sx), findClosestIndex(t0, ex) + 1);
+                    double P0_bar = getMean(P0_slice);
+
+                    // initialize the approximation
+                    GammaDistribution gammaDist = new GammaDistribution(b, a);
+                    double branch_prob = (1 - d) * gammaDist.density(ex - sx);
+                    double min_num_terms = (ex - sx) / (a * b);
+
+                    int i = 1;
+                    double update = 1;
+                    while (update > 1e-6 || i <= min_num_terms) {
+                        GammaDistribution newGammaDist = new GammaDistribution((i+1) * b, a);
+                        update = Math.pow(2, i) * Math.pow(1-d, i+1) * Math.pow(P0_bar, i) * newGammaDist.density(ex - sx);
+                        branch_prob += update;
+                        i++;
+                    }
+
+                    // take last element
+                    B[x] = branch_prob;
+                });
+
+        return B;
+    }
+
+
+
+
     // Function for partial convolution using FFT
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
@@ -335,6 +383,32 @@ public class GammaLogLikelihood {
 
         return xp;
     }
+
+
+    // Helper method to find the index of the closest value in the array
+    private static int findClosestIndex(double[] array, double value) {
+        int closestIndex = 0;
+        double minDiff = Math.abs(array[0] - value);
+
+        for (int i = 1; i < array.length; i++) {
+            double diff = Math.abs(array[i] - value);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = i;
+            }
+        }
+        return closestIndex;
+    }
+
+    // Helper method to calculate the mean of an array
+    private static double getMean(double[] array) {
+        double sum = 0;
+        for (double num : array) {
+            sum += num;
+        }
+        return sum / array.length;
+    }
+
 
     /* redundant calculation for P0 and P1
     private static Complex[] getPDF(double[] t, double a, double b) {

@@ -12,15 +12,15 @@ import java.util.Random;
 public class BranchList {
     private List<Branch> branches;
 
-    public BranchList(TreeInterface tree, double origin) {
+    public BranchList(TreeInterface tree, double origin, boolean typed) {
         branches = new ArrayList<>();
-        traverseTree(tree, origin);
+        traverseTree(tree, origin, typed);
         assignBranchIndices();
         findChildBranches();
     }
 
     // BFS traversal method to add branches to the list
-    private void traverseTree(TreeInterface tree, double origin) {
+    private void traverseTree(TreeInterface tree, double origin, boolean typed) {
         Node root = tree.getRoot();
         if (root == null) {
             return;
@@ -35,6 +35,16 @@ public class BranchList {
 
             int startNode = node.getNr();
             double startTime = node.getHeight();
+
+            // extract types of a typed tree
+            int nodeType;
+            if (typed) {
+                Double nodeTypeDouble = (Double) node.getMetaData("type");
+                nodeType = nodeTypeDouble.intValue();
+            } else {
+                nodeType = -1;
+            }
+
             int endNode;
             double endTime;
             if (parent == null) {
@@ -44,14 +54,14 @@ public class BranchList {
                 endNode = parent.getNr();
                 endTime = parent.getHeight();
             }
-            String branchType;
+            String branchMode;
             if (node.isLeaf()) {
-                branchType = "external";
+                branchMode = "external";
             } else {
-                branchType = "internal";
+                branchMode = "internal";
             }
 
-            branches.add(new Branch(startNode, endNode, startTime, endTime, branchType));  // Add branch to list
+            branches.add(new Branch(startNode, endNode, startTime, endTime, branchMode, nodeType));  // Add branch to list
 
             // Process left child
             if (node.getLeft() != null) {
@@ -118,7 +128,7 @@ public class BranchList {
     public int countExternalBranches() {
         int i = 0;
         for (Branch branch : branches) {
-            if (branch.branchMode.equals("internal")) {
+            if (branch.branchMode.equals("external")) {
                 i += 1;
             }
         }
@@ -129,7 +139,7 @@ public class BranchList {
     public int countInternalBranches() {
         int i = 0;
         for (Branch branch : branches) {
-            if (branch.branchMode.equals("external")) {
+            if (branch.branchMode.equals("internal")) {
                 i += 1;
             }
         }
@@ -137,8 +147,8 @@ public class BranchList {
     }
 
 
-    // Assign types (for testing)
-    public void assignTypes(int ntypes) {
+    // Assign random types (for testing)
+    public void assignRandomTypes(int ntypes) {
         Random random = new Random();
         random.setSeed(12345);
         for (Branch branch : branches) {

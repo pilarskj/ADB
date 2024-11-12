@@ -24,6 +24,7 @@ simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s,
   assert_that(all(sapply(seq(1, ntypes), function(i) {sum(2*Xsi_as[i, ]) + sum(Xsi_s[i, ]) == 1})),
               msg = 'The transition probabilities do not some to 1. Please check!')
   
+  # simulate full tree
   tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips)
   if (is.null(tree)) {
     return(NULL)
@@ -54,8 +55,7 @@ simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s,
 
 
 # Simulator of the complete Age-Dependent Branching Process
-simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips) {
-  #simulate_event <- function(id, time, type, parent_id) {}
+simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips = 2) {
   
   # initialize
   edges = matrix(nrow = 0, ncol = 2)
@@ -113,7 +113,6 @@ simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xs
       nodes[event$id, c("leftchild", "rightchild")] = c(left_id, right_id)
       edges = rbind(edges, c(event$id, left_id), c(event$id, right_id), deparse.level = 0)
       edge_lengths = c(edge_lengths, left_lifetime, right_lifetime)
-      #print(events)
     }
   }
   
@@ -134,12 +133,13 @@ simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xs
   edges_recoded = matrix(nodes[as.double(edges), 'label'], nrow = nrow(edges), ncol = ncol(edges))
   
   # create phylogenetic tree
-  phylo_tree = list(edge = edges_recoded, edge.length = edge_lengths, root.edge = root_edge, 
-                    Nnode = Nnode, tip.label = as.character(nodes[which(nodes$isTip == T), 'label']))
+  phylo_tree = list(edge = edges_recoded, edge.length = edge_lengths, Nnode = Nnode, 
+                    tip.label = as.character(nodes[which(nodes$isTip == T), 'label']))
   class(phylo_tree) = "phylo"
   
   # create treedata object
   tree = as.treedata(phylo_tree)
+  tree@phylo$root.edge = root_edge
   data = as_tibble(tree)
   types = nodes %>% 
     select(node = label, height, type) %>% 
@@ -175,7 +175,6 @@ sample_types <- function(parent_type, Xsi_as, Xsi_s) {
 }
 
 
-
 # Example
 origin_time = 10
 origin_type = 0
@@ -186,8 +185,12 @@ Xsi_as = rbind(c(0, 0.1), c(0.2, 0))
 Xsi_s = rbind(c(0.5, 0.3), c(0.1, 0.5))
 rho = 0.8
 set.seed(1)
+
+# tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s)
+# ggtree(tree) + geom_point(aes(color = type)) + geom_rootedge() + geom_tiplab() 
+# ggtree(tree) + geom_rootedge() + geom_point(aes(x = x - branch.length, color = type), size = 2)
 phylogeny = simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
-ggtree(phylogeny) + geom_point(aes(color = type))
+ggtree(phylogeny) + geom_point(aes(color = type)) 
 write.beast.newick(phylogeny)
 #for (i in seq(1, 1000)) {
 #  simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
@@ -195,13 +198,8 @@ write.beast.newick(phylogeny)
 
 
 # other:
-# tree = read.beast.newick(textConnection("<newick_string>;")) # to plot tree from Java simulator
-# tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s)
-# ggtree(tree) + geom_point(aes(color = type))
+# beast = read.beast.newick(textConnection("<newick_string>;")) # to plot tree from Java simulator
+# beast = read.beast.newick("~/intellij/ADBP/examples/tree_typed.newick") # example
+# beast@data = beast@data %>% mutate(type = as.factor(type))
+# ggtree(beast) + geom_point(aes(color = type))
 
-    
-
-
- 
-
-  

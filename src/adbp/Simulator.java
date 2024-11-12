@@ -2,19 +2,20 @@ package adbp;
 
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
-import beast.base.evolution.tree.TreeInterface;
 import org.apache.commons.math3.distribution.GammaDistribution;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 public class Simulator {
-    private Random random = new Random();
-    private int eventCounter = 0;
+    private Random random;
+    private int eventCounter;
 
     public Simulator() {
+        random = new Random();
+        random.setSeed(12345); // fixed seed for now - does not seem to work?
+        eventCounter = 0;
     }
 
     // Simulate a phylogeny from ADBP
