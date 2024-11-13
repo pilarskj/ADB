@@ -43,8 +43,6 @@ prune_tree <- function(tree, deathprob) {
     branch = edge[i, ]
     die = sample(c(TRUE, FALSE), 1, prob = c(deathprob, 1 - deathprob))
     if (die) {
-      # shorten branch to time of cell death 
-      edge.length[i] = runif(1, min = 0, max = edge.length[i])
       dying_node = branch[2]
       if (!dying_node %in% tree$tip.label) {
         # remove all offspring of dying cell 

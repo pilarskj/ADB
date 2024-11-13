@@ -4,8 +4,9 @@ library(dplyr)
 library(assertthat)
 library(ggtree) # for plotting
 
+source('sample_types.R')
 
-#' Simulator of a phylogeny from an Age-Dependent Branching Process
+#' Simulator of a phylogeny from an Age-Dependent Branching Process for a fixed time interval (since origin)
 #' @param origin_time time of birth of the initial particle
 #' @param origin_type one of 0,...,n-1 where n is the number of types
 #' @param a vector of scale parameters per type
@@ -13,6 +14,8 @@ library(ggtree) # for plotting
 #' @param d vector of death probabilities per type
 #' @param Xsi_as matrix of asymetric type transition probabilities
 #' @param Xsi_s matrix of symetric type transition probabilities
+#' @param rho sampling probability 
+#' @param rho minimum number of tips in the phylogeny
 simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho, min_tips = 2) {
   # assert that all inputs are correct
   ntypes = length(a)
@@ -31,10 +34,10 @@ simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s,
   }
   
   # prune dead particles
-  dead_nodes = tree %>% as_tibble %>% filter(!is.na(label) & height > 0) %>% pull(label)
+  dead_nodes = tree %>% as_tibble %>% filter(status == 0) %>% pull(label)
   phylogeny = drop.tip(tree, dead_nodes)
   if (is.null(phylogeny)) {
-    print('All particle died! Try another seed.')
+    message('All particle died! Try another seed.')
     return(NULL)
   }
 
@@ -42,136 +45,128 @@ simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s,
   tips = phylogeny@phylo$tip.label
   sampled_tips = sample(c(TRUE, FALSE), length(tips), prob = c(rho, 1 - rho), replace = TRUE)
   if (sum(sampled_tips) < min_tips) {
-    print('Not enough tips are sampled! Try another seed.')
+    message('Not enough tips are sampled! Try another seed.')
     return(NULL)
   }
   phylogeny = drop.tip(phylogeny, tips[!sampled_tips])
   
   # remove height from data for exporting tree
-  phylogeny@data = phylogeny@data %>% select(-height)
+  phylogeny@data = phylogeny@data %>% select(-status)
+                                             
+  # keep origin in final object
+  phylogeny@phylo$origin = tree@phylo$origin
   
   return(phylogeny)
 }
 
 
-# Simulator of the complete Age-Dependent Branching Process
+# Simulator of the complete Age-Dependent Branching Process for a fixed time interval (since origin)
 simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips = 2) {
   
   # initialize
   edges = matrix(nrow = 0, ncol = 2)
   edge_lengths = c()
-  nodes = matrix(nrow = 0, ncol = 7, 
-                 dimnames = list(NULL, c("id", "height", "type", "parent", "leftchild", "rightchild", "isTip")))
+  nodes = data.frame(
+    id = integer(0), 
+    height = numeric(0), 
+    type = integer(0), 
+    parent = integer(0), 
+    leftchild = integer(0), 
+    rightchild = integer(0), 
+    status = integer(0) # 0 = dead, 1 = alive, 2 = divided
+  )
+  #nodes = matrix(nrow = 0, ncol = 7, 
+  #               dimnames = list(NULL, c("id", "height", "type", "parent", "leftchild", "rightchild", "isTip")))
   
   # sample the lifetime of the first particle
   root_edge = rgamma(1, shape = b[origin_type + 1], scale = a[origin_type + 1])
-  nodes = rbind(nodes, c(1, origin_time - root_edge, origin_type, NA, NA, NA, F))
-  events = rbind(matrix(nrow = 2, ncol = 7), nodes) # add dummy rows due to type conversions
+  nodes = bind_rows(nodes, c(id = 1, height = origin_time - root_edge, type = origin_type, 
+                             parent = NA, leftchild = NA, rightchild = NA, status = 1))
+  events = nodes
   event_counter = 1
   
-  while (nrow(events) > 2) {
-    event = as.list(events[3, ]); events = events[-3, ] # look at one event
+  while (nrow(events) > 0) {
+    event = as.list(events[1, ]); events = events[-1, ] # look at one event
 
     if (runif(1) < d[event$type + 1]) {
       # particle dies
-      nodes[event$id, "isTip"] = T
+      nodes[event$id, "status"] = 0
     } else {
       # particle divides, create two new children
       left_id = event_counter + 1
       right_id = event_counter + 2
       event_counter = event_counter + 2
+      nodes[event$id, "status"] = 2
 
       # sample types
       children_types = sample_types(event$type, Xsi_as, Xsi_s)
-      left_type = children_types[1]
-      right_type = children_types[2]
 
       # sample lifetimes and add new nodes
       left_lifetime = rgamma(1, shape = b[event$type + 1], scale = a[event$type + 1])
       if (event$height - left_lifetime < 0) {
-        # censor lifetime, make tip
+        # censor lifetime
         left_lifetime = event$height
-        nodes = rbind(nodes, c(left_id, 0, left_type, event$id, NA, NA, T), deparse.level = 0)
+        left_node = c(id = left_id, height = event$height - left_lifetime, type = children_types[1], 
+                      parent = event$id, leftchild = NA, rightchild = NA, status = 1)
       } else {
-        left_node = c(left_id, event$height - left_lifetime, left_type, event$id, NA, NA, F)
-        nodes = rbind(nodes, left_node, deparse.level = 0)
-        events = rbind(events, left_node, deparse.level = 0) # to be processed
+        left_node = c(id = left_id, height = event$height - left_lifetime, type = children_types[1], 
+                      parent = event$id, leftchild = NA, rightchild = NA, status = 1)
+        events = bind_rows(events, left_node) # to be processed
       }
 
       right_lifetime = rgamma(1, shape = b[event$type + 1], scale = a[event$type + 1])
       if (event$height - right_lifetime < 0) {
         # censor lifetime, make tip
         right_lifetime = event$height
-        nodes = rbind(nodes, c(right_id, 0, right_type, event$id, NA, NA, T), deparse.level = 0)
+        right_node = c(id = right_id, height = event$height - right_lifetime, type = children_types[2], 
+                      parent = event$id, leftchild = NA, rightchild = NA, status = 1)
       } else {
-        right_node = c(right_id, event$height - right_lifetime, right_type, event$id, NA, NA, F)
-        nodes = rbind(nodes, right_node, deparse.level = 0)
-        events = rbind(events, right_node, deparse.level = 0) # to be processed
+        right_node = c(id = right_id, height = event$height - right_lifetime, type = children_types[2], 
+                       parent = event$id, leftchild = NA, rightchild = NA, status = 1)
+        events = bind_rows(events, right_node) # to be processed
       }
     
       # add child relationships and append the current edges and edge lengths
+      nodes = bind_rows(nodes, left_node, right_node)
       nodes[event$id, c("leftchild", "rightchild")] = c(left_id, right_id)
-      edges = rbind(edges, c(event$id, left_id), c(event$id, right_id), deparse.level = 0)
+      edges = rbind(edges, c(event$id, left_id), c(event$id, right_id))
       edge_lengths = c(edge_lengths, left_lifetime, right_lifetime)
     }
   }
   
   # check number of tips
-  nodes = data.frame(nodes)
-  Nnode = sum(!nodes$isTip)
-  Ntip = sum(nodes$isTip)
+  Nnode = sum(nodes$status == 2)
+  Ntip = sum(nodes$status %in% c(0,1))
   if (Ntip < min_tips) {
-    print("The simulated tree has too few tips. Try another seed.")
+    message("The simulated tree has too few tips. Try another seed.")
     return(NULL)
   }
   
   # assign labels
-  nodes[which(nodes$isTip == T), 'label'] = c(1:Ntip) 
-  nodes[which(nodes$isTip == F), 'label'] = c((Ntip + 1):(Ntip + Nnode)) 
+  nodes[which(nodes$status %in% c(0,1)), 'label'] = c(1:Ntip) 
+  nodes[which(nodes$status == 2), 'label'] = c((Ntip + 1):(Ntip + Nnode)) 
   
   # use labels in edge matrix
   edges_recoded = matrix(nodes[as.double(edges), 'label'], nrow = nrow(edges), ncol = ncol(edges))
   
   # create phylogenetic tree
   phylo_tree = list(edge = edges_recoded, edge.length = edge_lengths, Nnode = Nnode, 
-                    tip.label = as.character(nodes[which(nodes$isTip == T), 'label']))
+                    tip.label = as.character(nodes[which(nodes$status %in% c(0,1)), 'label']))
   class(phylo_tree) = "phylo"
   
   # create treedata object
   tree = as.treedata(phylo_tree)
   tree@phylo$root.edge = root_edge
+  tree@phylo$origin = origin_time
   data = as_tibble(tree)
   types = nodes %>% 
-    select(node = label, height, type) %>% 
+    select(node = label, status, type) %>% 
     mutate(type = as.factor(type)) %>%
     arrange(node) %>%
     as_tibble
   tree@data = types
   
   return(tree)
-}
-
-  
-sample_types <- function(parent_type, Xsi_as, Xsi_s) {
-  ntypes = ncol(Xsi_s)
-  
-  cum_prob = 0
-  for (i in seq(0, ntypes - 1)) {
-    # symmetric case
-    cum_prob = cum_prob + Xsi_s[parent_type + 1, i + 1];
-    if (runif(1) < cum_prob) {
-      return(c(i, i))
-    }
-    # asymmetric case
-    cum_prob = cum_prob + 2*Xsi_as[parent_type + 1, i + 1];
-    if (runif(1) < cum_prob) {
-      if (runif(1) < 0.5) {
-        return(c(parent_type, i))
-      } else {
-        return(c(i, parent_type))
-      }
-    }
-  }
 }
 
 
@@ -187,14 +182,11 @@ rho = 0.8
 set.seed(1)
 
 # tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s)
-# ggtree(tree) + geom_point(aes(color = type)) + geom_rootedge() + geom_tiplab() 
+# ggtree(tree) + geom_point(aes(color = type)) + geom_rootedge() + geom_tiplab() + theme_tree2()
 # ggtree(tree) + geom_rootedge() + geom_point(aes(x = x - branch.length, color = type), size = 2)
 phylogeny = simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
-ggtree(phylogeny) + geom_point(aes(color = type)) 
+ggtree(phylogeny) + geom_point(aes(color = type))
 write.beast.newick(phylogeny)
-#for (i in seq(1, 1000)) {
-#  simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
-#}
 
 
 # other:
