@@ -16,7 +16,7 @@ source('sample_types.R')
 #' @param Xsi_s matrix of symetric type transition probabilities
 #' @param rho sampling probability 
 #' @param rho minimum number of tips in the phylogeny
-simulate_phylogeny <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho, min_tips = 2) {
+simulate_phylogeny <- function(origin_time, a, b, d = 0, origin_type = 0, Xsi_as = matrix(0), Xsi_s = matrix(1), rho = 1, min_tips = 2) {
   # assert that all inputs are correct
   ntypes = length(a)
   assert_that(all(c(length(b) == ntypes, length(d) == ntypes, 
@@ -170,23 +170,23 @@ simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xs
 }
 
 
-# Example
-origin_time = 10
-origin_type = 0
-a = c(2, 3)
-b = c(1, 2)
-d = c(0.2, 0.1)
-Xsi_as = rbind(c(0, 0.1), c(0.2, 0))
-Xsi_s = rbind(c(0.5, 0.3), c(0.1, 0.5))
-rho = 0.8
-set.seed(1)
+# # Example
+# origin_time = 10
+# origin_type = 0
+# a = c(2, 3)
+# b = c(1, 2)
+# d = c(0.2, 0.1)
+# Xsi_as = rbind(c(0, 0.1), c(0.2, 0))
+# Xsi_s = rbind(c(0.5, 0.3), c(0.1, 0.5))
+# rho = 0.8
+# set.seed(1)
 
 # tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s)
 # ggtree(tree) + geom_point(aes(color = type)) + geom_rootedge() + geom_tiplab() + theme_tree2()
 # ggtree(tree) + geom_rootedge() + geom_point(aes(x = x - branch.length, color = type), size = 2)
-phylogeny = simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
-ggtree(phylogeny) + geom_point(aes(color = type))
-write.beast.newick(phylogeny)
+# phylogeny = simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
+# ggtree(phylogeny) + geom_point(aes(color = type))
+# write.beast.newick(phylogeny)
 
 
 # other:
