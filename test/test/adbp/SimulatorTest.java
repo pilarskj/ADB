@@ -18,9 +18,9 @@ public class SimulatorTest {
         double[] d = {0.2, 0.1};
         double rho = 0.5;
         double[][] Xsi_as = {{0, 0.1},
-                {0.2, 0}};
+                             {0.2, 0}};
         double[][] Xsi_s = {{0.5, 0.3},
-                {0.1, 0.5}};
+                            {0.1, 0.5}};
 
         Simulator sim = new Simulator();
         //Tree tree = sim.simulateCompleteTree(origin, originType, a, b, d, Xsi_as, Xsi_s);
@@ -94,5 +94,4 @@ public class SimulatorTest {
             System.out.println(tree.getRoot().toNewick());
         }
     }
-
 }

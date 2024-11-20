@@ -9,6 +9,11 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 
+/*
+Class for storing branches of a phylogenetic tree in a list.
+Contains functions for traversing a tree starting from the root and recording relevant information for each branch.
+Keeps track of start and end time, left and right child, and type of each branch.
+ */
 public class BranchList {
     private List<Branch> branches;
 
@@ -27,16 +32,13 @@ public class BranchList {
         }
 
         Queue<Node> queue = new LinkedList<>();
-        queue.add(root);  // Start the traversal from the root
+        queue.add(root); // start traversal from the root
 
         while (!queue.isEmpty()) {
-            Node node = queue.poll();  // Dequeue the current node
+            Node node = queue.poll(); // dequeue current node
             Node parent = node.getParent();
 
-            int startNode = node.getNr();
-            double startTime = node.getHeight();
-
-            // extract types of a typed tree
+            // extract node type
             int nodeType;
             if (typed) {
                 Double nodeTypeDouble = (Double) node.getMetaData("type");
@@ -44,6 +46,10 @@ public class BranchList {
             } else {
                 nodeType = -1;
             }
+
+            // get start and end time
+            int startNode = node.getNr();
+            double startTime = node.getHeight();
 
             int endNode;
             double endTime;
@@ -54,6 +60,8 @@ public class BranchList {
                 endNode = parent.getNr();
                 endTime = parent.getHeight();
             }
+
+            // get mode
             String branchMode;
             if (node.isLeaf()) {
                 branchMode = "external";
@@ -61,16 +69,13 @@ public class BranchList {
                 branchMode = "internal";
             }
 
-            branches.add(new Branch(startNode, endNode, startTime, endTime, branchMode, nodeType));  // Add branch to list
+            branches.add(new Branch(startNode, endNode, startTime, endTime, branchMode, nodeType)); // add branch to list
 
-            // Process left child
             if (node.getLeft() != null) {
-                queue.add(node.getLeft());  // Enqueue the left child
+                queue.add(node.getLeft()); // enqueue left child
             }
-
-            // Process right child
             if (node.getRight() != null) {
-                queue.add(node.getRight());  // Enqueue the right child
+                queue.add(node.getRight()); // enqueue right child
             }
         }
     }
@@ -99,8 +104,8 @@ public class BranchList {
         for (Branch b : branches) {
             if (b.branchMode.equals("internal")) {
                 List<Integer> children = branches.stream()
-                        .filter(x -> x.endNode == b.startNode) // Filter branches where endNode matches startNode
-                        .map(x -> x.branchIndex)               // Get the index of matching branches
+                        .filter(x -> x.endNode == b.startNode) // filter branches where endNode matches startNode
+                        .map(x -> x.branchIndex) // get the index of matching branches
                         .toList();
                 b.leftIndex = children.get(0);
                 b.rightIndex = children.get(1);
@@ -108,7 +113,7 @@ public class BranchList {
         }
     }
 
-    // Get branches as List or looping
+    // Get branches as List for looping
     public List<Branch> listBranches() {
         return branches;
     }
@@ -120,7 +125,6 @@ public class BranchList {
                 return branch;
             }
         }
-        // If no branch is found with the given branchIndex, throw an exception
         throw new IllegalArgumentException("Branch not found for index: " + i);
     }
 
@@ -146,7 +150,6 @@ public class BranchList {
         return i;
     }
 
-
     // Assign random types (for testing)
     public void assignRandomTypes(int ntypes) {
         Random random = new Random();
@@ -156,7 +159,6 @@ public class BranchList {
             branch.nodeType = randomType;
         }
     }
-
 }
 
 

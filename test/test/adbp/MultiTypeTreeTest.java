@@ -4,7 +4,6 @@ import multitypetree.evolution.tree.MultiTypeNode;
 import multitypetree.evolution.tree.MultiTypeTreeFromNewick;
 import org.junit.jupiter.api.Test;
 
-
 public class MultiTypeTreeTest {
 
     @Test

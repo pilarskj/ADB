@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/*
+Class for simulating a phylogeny under the Age-Dependent Branching Process, given the origin (time).
+ */
 public class Simulator {
     private Random random;
     private int eventCounter;
@@ -26,26 +29,26 @@ public class Simulator {
     }
 
 
-    // Simulate the full Age-Dependent Branching Process
+    // Simulate the full ADBP
     public Tree simulateCompleteTree(double origin, int originType, double[] a, double[] b, double[] d, double[][] Xsi_as, double[][] Xsi_s) {
 
         double rootTime = origin - sampleLifetime(a[originType], b[originType]);
 
-        // Create the root node for the tree (first event)
+        // create the root node for the tree (first event)
         Node root = new Node();
         root.setNr(0);  // node number
         root.setHeight(rootTime);  // birth time (height in BEAST2)
         root.setMetaData("type", originType); // type (trait)
         root.metaDataString = "type=" + originType; // add string (for Newick format)
 
-        // Create a Tree object to store the nodes
+        // create a Tree object to store the nodes
         Tree tree = new Tree(root);
 
-        // List to keep track of living particles that need to be processed
+        // list to keep track of living particles that need to be processed
         List<Node> events = new ArrayList<>();
         events.add(root);
 
-        // Simulate the ADBP process
+        // simulate the ADBP process
         while (!events.isEmpty()) {
             Node event = events.remove(0); // look at an event
             int nodeType = (int) event.getMetaData("type"); // type of current particle
@@ -90,7 +93,6 @@ public class Simulator {
             }  // in case of death, do nothing
         }
 
-        // Return the constructed tree
         return tree;
     }
 
@@ -112,11 +114,10 @@ public class Simulator {
         }
 
         int n = nodesToPrune.size();
-        //System.out.println(n + " leaves to prune: ");
         if (n == leaves.size()) {
-            //System.out.println("nothing remains!");
             return null;
         }
+
         /*
         // print the list
         int[] leavesToPrune = new int[n];
@@ -151,7 +152,6 @@ public class Simulator {
             } else if (parent.getChildCount() == 0) {
                 nodesToPrune.add(parent); // continue recursively
             }
-            //System.out.println(tree.getNodeCount());
         }
 
         return tree;

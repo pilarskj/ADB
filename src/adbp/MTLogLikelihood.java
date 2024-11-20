@@ -12,14 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static adbp.GammaLogLikelihood.convolveFFT;
+import static adbp.GammaLogLikelihood.padZeros;
+
+/*
+Class for solving the equations for P0, P1 and B in the multi-type case
+and for calculating the likelihood of an uncoloured (or coloured) tree
+based on the parameters, branching times, and types at tips (and internal nodes).
+ */
 public class MTLogLikelihood {
 
-    public static double calcLogLikelihood(double[] a, double[] b, double[] d, double rho,
-                                           double[][] Xsi_as, double[][] Xsi_s,
-                                           double t_or, int[] types, //int type_or,
-                                           double[] int_s, double[] int_e, double[] ext_e,
-                                           int[] left_child, int[] right_child,
-                                           int m, int mB, int maxit) {
+    // can those be initialized once and re-used?
+    public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+    public static LinearInterpolator interpolator = new LinearInterpolator();
+
+    public static double calcMTLogLikelihood(double[] a, double[] b, double[] d, double rho,
+                                             double[][] Xsi_as, double[][] Xsi_s,
+                                             double t_or, int[] types, //int type_or,
+                                             double[] int_s, double[] int_e, double[] ext_e,
+                                             int[] left_child, int[] right_child,
+                                             int maxIt, double tolP, double tolB, int mP, int mB) {
 
         // get number of types
         int ntypes = a.length;
@@ -29,8 +41,8 @@ public class MTLogLikelihood {
         // get number of tips
         int ntips = ext_e.length;
 
-        // m must be a power of 2 (required by FFT!)
         // generate linearly spaced values between 0 and origin
+        int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
         double[] t_seq = new double[m];
         double dx = t_or / m;
         for (int i = 0; i < m; i++) {
@@ -53,7 +65,6 @@ public class MTLogLikelihood {
                     }
 
                     // perform FFT
-                    FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
                     Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
                     for (int i = 0; i < m*2; i++) {
                         pdf_FFT[i][x] = Ft[i];
@@ -61,21 +72,21 @@ public class MTLogLikelihood {
                 });
 
         // calculate extinction probability over time
-        double[][] P0 = calcP0(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, t_seq, dx, maxit);
+        double[][] P0 = calcMTP0(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, t_seq, dx, maxIt, tolP);
 
         // calculate probability of single descendants at tips
-        double[][] P1 = calcP1(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, ext_e, t_seq, P0, dx, maxit);
+        double[][] P1 = calcMTP1(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, ext_e, t_seq, P0, dx, maxIt, tolP);
 
         // calculate probabilities of internal branches
-        double[][] B = calcB(a, b, d, Xsi_as, Xsi_s, int_s, int_e, t_seq, P0, mB, maxit);
-        //System.out.println(Arrays.deepToString(B));
+        double[][] B = calcMTB(a, b, d, Xsi_as, Xsi_s, int_s, int_e, t_seq, P0, maxIt, tolB, mB);
+        // System.out.println(Arrays.deepToString(B));
 
         // start recursion
         double treeL = calcLikelihoodColoured(1, ntips, 0, types[0], types,
                 left_child, right_child, Xsi_as, Xsi_s, P1, B);
         // uncoloured (super slow)
-        //double treeL = calcLikelihoodUncoloured(1, ntips, ntypes, 0, type_or, left_child, right_child,
-        //       Xsi_as, Xsi_s, P1, B);
+        // double treeL = calcLikelihoodUncoloured(1, ntips, ntypes, 0, type_or, left_child, right_child,
+        //        Xsi_as, Xsi_s, P1, B);
 
         return Math.log(treeL);
     }
@@ -87,10 +98,10 @@ public class MTLogLikelihood {
                                                 double[][] Xsi_as, double[][] Xsi_s,
                                                 double[][] P1, double[][] B) {
 
-        //System.out.println("branch " + stem_index + ", type " + stem_type);
         // at tips
         if (stem_index >= ntips - 1) {
             likelihood = P1[stem_index - (ntips - 1)][stem_type];
+
         } else {
             // get subtree (new stems)
             int right_stem = right_child[stem_index];
@@ -120,25 +131,27 @@ public class MTLogLikelihood {
 
             likelihood = B[stem_index][stem_type] * subtreeL;
         }
+
         return likelihood;
     }
 
 
-    // Recursive function for calculating the tree likelihood (for a uncoloured tree)
+    // Recursive function for calculating the tree likelihood (for an uncoloured tree)
     public static double calcLikelihoodUncoloured(double likelihood, int ntips, int ntypes,
                                                   int stem_index, int stem_type, int[] left_child, int[] right_child,
                                                   double[][] Xsi_as, double[][] Xsi_s,
                                                   double[][] P1, double[][] B) {
-        System.out.println(stem_index + " type " + stem_type);
+
         // at tips
         if (stem_index >= ntips - 1) {
             return P1[stem_index - (ntips - 1)][stem_type];
-        } else {
 
+        } else {
             // recursion
             double subtreeL = 0;
             // loop over all possible types at internal nodes
             for (int j = 0;  j < ntypes; j++){
+
                 // get subtree (new stems)
                 int right_stem = right_child[stem_index];
                 int left_stem = left_child[stem_index];
@@ -161,9 +174,8 @@ public class MTLogLikelihood {
 
 
     // Function for calculating the extinction probability
-    public static double[][] calcP0(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho,
-                                    double[][] Xsi_as, double[][] Xsi_s,
-                                    double[] t, double dx, int maxit) {
+    public static double[][] calcMTP0(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
+                                      double[] t, double dx, int maxIt, double tol) {
 
         // get number of types and time steps
         int n = cdf[0].length;
@@ -183,7 +195,7 @@ public class MTLogLikelihood {
         double[][] X = X0;
 
         // iterate
-        while (err > 1e-12 && it < maxit) {
+        while (err > tol && it < maxIt) {
             double[][] Xi = new double[m][n];
 
             for (int j = 0; j < n; j++) {
@@ -217,7 +229,7 @@ public class MTLogLikelihood {
             it++;
         }
 
-        if (it == maxit) {
+        if (it == maxIt) {
             System.err.printf("calcP0 Warning: max iterations reached with error: %.2f%n", err);
         }
 
@@ -226,9 +238,8 @@ public class MTLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    public static double[][] calcP1(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho,
-                                    double[][] Xsi_as, double[][] Xsi_s,
-                                    double[] t, double[] t0, double[][] P0, double dx, int maxit) {
+    public static double[][] calcMTP1(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
+                                      double[] ext_t, double[] t0, double[][] P0, double dx, int maxIt, double tol) {
 
         // get number of types and time steps
         int n = cdf[0].length;
@@ -248,7 +259,7 @@ public class MTLogLikelihood {
         double[][] X = X0;
 
         // iterate
-        while (err > 1e-12 && it < maxit) {
+        while (err > tol && it < maxIt) {
             double[][] Xi = new double[m][n];
 
             for (int j = 0; j < n; j++) {
@@ -283,12 +294,12 @@ public class MTLogLikelihood {
             it++;
         }
 
-        if (it == maxit) {
+        if (it == maxIt) {
             System.err.printf("calcP1 Warning: max iterations reached with error: %.2f%n", err);
         }
 
         // interpolate: evaluate at tip times
-        int ntips = t.length;
+        int ntips = ext_t.length;
         double[][] P1 = new double[ntips][n];
 
         for (int j = 0; j < n; j++) {
@@ -297,11 +308,10 @@ public class MTLogLikelihood {
             for (int i = 0; i < m; i++) {
                 Xj[i] = X[i][j];
             }
-            LinearInterpolator interpolator = new LinearInterpolator();
             UnivariateFunction function = interpolator.interpolate(t0, Xj);
 
             for (int i = 0; i < ntips; i++) {
-                P1[i][j] = function.value(t[i]);
+                P1[i][j] = function.value(ext_t[i]);
             }
         }
 
@@ -310,9 +320,9 @@ public class MTLogLikelihood {
 
 
     // Function for calculating branch probabilities
-    public static double[][] calcB(double[] a, double[] b, double[] d, double[][] Xsi_as, double[][] Xsi_s,
-                                   double[] s, double[] e, double[] t0, double[][] P0,
-                                   int m, int maxit) {
+    public static double[][] calcMTB(double[] a, double[] b, double[] d, double[][] Xsi_as, double[][] Xsi_s,
+                                     double[] s, double[] e, double[] t0, double[][] P0,
+                                     int maxIt, double tol, int m) {
 
         // get number of types and branches
         int ntypes = a.length;
@@ -329,7 +339,6 @@ public class MTLogLikelihood {
                     for (int i = 0; i < t0.length; i++) {
                         P0j[i] = P0[i][j];
                     }
-                    LinearInterpolator interpolator = new LinearInterpolator();
                     UnivariateFunction function = interpolator.interpolate(t0, P0j);
                     functions.add(function);
                 });
@@ -368,7 +377,6 @@ public class MTLogLikelihood {
                         }
 
                         // perform FFT
-                        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
                         Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
                         for (int i = 0; i < m*2; i++) {
                             pdf_FFT[i][j] = Ft[i];
@@ -381,7 +389,7 @@ public class MTLogLikelihood {
                     double[][] X = X0;
 
                     // iterate
-                    while (err > 1e-12 && it < maxit) {
+                    while (err > tol && it < maxIt) {
                         double[][] Xi = new double[m][ntypes];
 
                         for (int j = 0; j < ntypes; j++) {
@@ -418,7 +426,7 @@ public class MTLogLikelihood {
                         it++;
                     }
 
-                    if (it == maxit) {
+                    if (it == maxIt) {
                         System.err.printf("calcB branch %d Warning: max iterations reached with error: %.2f%n", x, err);
                     }
 
@@ -430,47 +438,7 @@ public class MTLogLikelihood {
     }
 
 
-    // Function for partial convolution using FFT
-    public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
-
-        // pad y
-        double[] y_ext = padZeros(y);
-
-        // perform FFT on y_ext
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] fy = fft.transform(y_ext, TransformType.FORWARD);
-
-        // element-wise multiplication of fx and fy (convolution in Fourier space)
-        Complex[] fz = new Complex[fx.length];
-        for (int i = 0; i < fx.length; i++) {
-            fz[i] = fx[i].multiply(fy[i]);
-        }
-
-        // perform inverse FFT to get the result back in time domain
-        Complex[] z = fft.transform(fz, TransformType.INVERSE);
-
-        // extract the real part and scale it by eps
-        double[] z_real = new double[n];
-        for (int i = 0; i < n; i++) {
-            z_real[i] = z[i].getReal() * eps;
-        }
-
-        return z_real;
-    }
-
-
-    private static double[] padZeros(double[] x) {
-        int n = x.length;
-
-        // extend x
-        double[] xp = new double[n * 2];
-        System.arraycopy(x, 0, xp, 0, n);
-
-        return xp;
-    }
-
-
-    // Function for calculating the 1-(Manhattan)-distance between two matrices,
+    // Helper method for calculating the 1-(Manhattan)-distance between two matrices,
     // which is the maximum absolute column sum of the matrices substracted element-wise
     private static double getMatrixError(double[][] X, double[][] Y) {
         int m = X.length; // number of rows

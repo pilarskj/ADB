@@ -12,35 +12,51 @@ import org.apache.commons.math3.analysis.UnivariateFunction;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
-
+/*
+Class for solving the equations for P0, P1 and B
+and for calculating the likelihood of a tree based on the parameters and branching times
+ */
 public class GammaLogLikelihood {
 
-    public static double calcLogLikelihood(double rho, double a, double b, double d,
-                                           double t_or, double[] int_s, double[] int_e, double[] ext_e,
-                                           int mP, int mB, int maxit) {
-        // set large m for P0 and P1
-        int m = mP;
-        // m must be a power of 2 (required by FFT!)
+    // can those be initialized once and re-used?
+    public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+    public static EuclideanDistance norm = new EuclideanDistance();
+    public static LinearInterpolator interpolator = new LinearInterpolator();
+
+    // Main function for calculating the likelihood of the tree
+    public static double calcLogLikelihood(double a, int b, double d, double rho, double origin,
+                                           double[] int_s, double[] int_e, double[] ext_e,
+                                           int maxIt, double tolP, double tolB, int mP, int mB) {
+        // initialize distribution
+        GammaDistribution gammaDist = new GammaDistribution(b, a);
+
         // generate linearly spaced values between 0 and origin
+        int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
         double[] t_seq = new double[m];
-        double dx = t_or / m; // (m - 1)
+        double dx = origin / m;
         for (int i = 0; i < m; i++) {
-            t_seq[i] = dx * (i + 1); // i
+            t_seq[i] = dx * (i + 1);
         }
-        assert t_seq[m - 1] == t_or;
+        assert t_seq[m - 1] == origin;
+
+        // calculate CDF and FFT from PDF from 0 to origin
+        double[] pdf = new double[m];
+        double[] cdf = new double[m];
+        for (int i = 0; i < m; i++) {
+            pdf[i] = gammaDist.density(t_seq[i]);
+            cdf[i] = gammaDist.cumulativeProbability(t_seq[i]);
+        }
+        Complex[] pdf_FFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
 
         // calculate extinction probability over time
-        double[] P0 = calcP0(rho, a, b, d, t_seq, dx, maxit);
+        double[] P0 = calcP0(pdf_FFT, cdf, d, rho, dx, maxIt, tolP);
 
         // calculate probability of single descendants at tips
-        double[] P1 = calcP1(rho, a, b, d, ext_e, t_seq, P0, dx, maxit);
-
-        // reduce m for B
-        m = mB;
+        double[] P1 = calcP1(pdf_FFT, cdf, P0, d, rho, ext_e, t_seq, dx, maxIt, tolP);
 
         // calculate probabilities of internal branches
-        // double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, m, maxit);
-        double[] B = approxB(a, b, d, int_s, int_e, t_seq, P0);
+        // double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, maxIt, tolB, mB);
+        double[] B = approxB(a, b, d, int_s, int_e, t_seq, P0, tolB);
 
         // make log and sum
         double logP1 = 0;
@@ -53,25 +69,15 @@ public class GammaLogLikelihood {
         }
 
         // sum
-        double logL = logP1 + logB;
-        return logL;
+        return logP1 + logB;
     }
 
 
     // Function for calculating the extinction probability
-    public static double[] calcP0(double rho, double a, double b, double d, double[] t, double dx, int maxit) {
+    public static double[] calcP0(Complex[] pdf_FFT, double[] cdf, double d, double rho, double dx, int maxIt, double tol) {
 
         // get length
-        int n = t.length;
-
-        // calculate the PDF and CDF of the gamma distribution
-        double[] pdf = new double[n];
-        double[] cdf = new double[n];
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
-        for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t[i]);
-            cdf[i] = gammaDist.cumulativeProbability(t[i]);
-        }
+        int n = cdf.length;
 
         // initialize
         double[] X0 = new double[n];
@@ -84,14 +90,8 @@ public class GammaLogLikelihood {
         int it = 0;
         double[] X = X0;
 
-        // perform FFT
-        double[] ft = padZeros(pdf);
-
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] Ft = fft.transform(ft, TransformType.FORWARD);
-
         // iterate
-        while (err > 1e-12 && it < maxit) {
+        while (err > tol && it < maxIt) {
 
             // square
             double[] y = new double[n];
@@ -100,7 +100,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(Ft, y, n, dx);
+            double[] I = convolveFFT(pdf_FFT, y, n, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -109,7 +109,6 @@ public class GammaLogLikelihood {
             }
 
             // compute error
-            EuclideanDistance norm = new EuclideanDistance();
             err = norm.compute(Xi, X);
 
             // update
@@ -117,29 +116,22 @@ public class GammaLogLikelihood {
             it++;
         }
 
-        if (it == maxit) {
-            System.err.printf("calcP0 Warning: max iterations reached with error: %.2f%n", err);
+        /* for asserting convergence
+        if (it == maxIt) {
+            System.err.printf("calcP0 Warning: max iterations reached with error: %.2f%n", err); // check if error is huge!
         }
+         */
 
         return X;
     }
 
 
     // Function for calculating the probability of a single descendant
-    public static double[] calcP1(double rho, double a, double b, double d,
-                                  double[] t, double[] t0, double[] P0, double dx, int maxit) {
+    public static double[] calcP1(Complex[] pdf_FFT, double[] cdf, double[] P0, double d, double rho,
+                                  double[] ext_t, double[] t_seq, double dx, int maxIt, double tol) {
 
         // get length
-        int n = t0.length;
-
-        // calculate the PDF and CDF of the gamma distribution
-        double[] pdf = new double[n];
-        double[] cdf = new double[n];
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
-        for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t0[i]);
-            cdf[i] = gammaDist.cumulativeProbability(t0[i]);
-        }
+        int n = t_seq.length;
 
         // initialize
         double[] X0 = new double[n];
@@ -152,13 +144,8 @@ public class GammaLogLikelihood {
         int it = 0;
         double[] X = X0;
 
-        // perform FFT
-        double[] ft = padZeros(pdf);
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
-
         // iterate
-        while (err > 1e-12 && it < maxit) {
+        while (err > tol && it < maxIt) {
 
             // multiply
             double[] y = new double[n];
@@ -167,7 +154,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(Ft, y, n, dx);
+            double[] I = convolveFFT(pdf_FFT, y, n, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -176,7 +163,6 @@ public class GammaLogLikelihood {
             }
 
             // compute error
-            EuclideanDistance norm = new EuclideanDistance();
             err = norm.compute(X, Xi);
 
             // update
@@ -184,28 +170,32 @@ public class GammaLogLikelihood {
             it++;
         }
 
-        if (it == maxit) {
+        /*
+        if (it == maxIt) {
             System.err.printf("calcP1 Warning: max iterations reached with error: %.2f%n", err);
         }
+         */
 
         // interpolate
-        LinearInterpolator interpolator = new LinearInterpolator();
-        UnivariateFunction function = interpolator.interpolate(t0, X);
-        double[] P1 = new double[t.length];
-        for (int i = 0; i < t.length; i++) {
-            P1[i] = function.value(t[i]);
+        UnivariateFunction function = interpolator.interpolate(t_seq, X);
+        double[] P1 = new double[ext_t.length];
+        for (int i = 0; i < ext_t.length; i++) {
+            P1[i] = function.value(ext_t[i]);
         }
+
         return P1;
     }
 
 
     // Function for calculating branch probabilities
-    public static double[] calcB(double a, double b, double d,
+    public static double[] calcB(double a, int b, double d,
                                  double[] s, double[] e, double[] t0, double[] P0,
-                                 int m, int maxit) {
+                                 int maxIt, double tol, int m) {
+
+        // initialize distribution
+        GammaDistribution gammaDist = new GammaDistribution(b, a);
 
         // interpolate P0
-        LinearInterpolator interpolator = new LinearInterpolator();
         UnivariateFunction function = interpolator.interpolate(t0, P0);
 
         // get number of branches
@@ -224,25 +214,21 @@ public class GammaLogLikelihood {
                     // generate linearly spaced values between start and end
                     double[] t_seq = new double[m];
                     double[] age_seq = new double[m];
-                    double dx = (ex - sx) / m; // (m - 1)
+                    double dx = (ex - sx) / m;
                     for (int i = 0; i < m; i++) {
-                        t_seq[i] = sx + dx * (i + 1); // i
+                        t_seq[i] = sx + dx * (i + 1);
                         age_seq[i] = t_seq[i] - sx;
                     }
-                    assert t_seq[m - 1] == ex;
+                    assert age_seq[m - 1] == ex - sx;
 
-                    // calculate the PDF of the gamma distribution
+                    // calculate the PDF of the gamma distribution and compute P0
                     double[] pdf = new double[m];
-                    GammaDistribution gammaDist = new GammaDistribution(b, a);
-                    for (int i = 0; i < m; i++) {
-                        pdf[i] = gammaDist.density(age_seq[i]);
-                    }
-
-                    // interpolate
                     double[] P = new double[m];
                     for (int i = 0; i < m; i++) {
+                        pdf[i] = gammaDist.density(age_seq[i]);
                         P[i] = function.value(t_seq[i]);
                     }
+                    Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD); // perform FFT
 
                     // initialize
                     double[] X0 = new double[m];
@@ -255,13 +241,8 @@ public class GammaLogLikelihood {
                     int it = 0;
                     double[] X = X0;
 
-                    // perform FFT
-                    double[] ft = padZeros(pdf);
-                    FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-                    Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
-
                     // iterate
-                    while (err > 1e-12 && it < maxit) {
+                    while (err > tol && it < maxIt) {
 
                         // multiply
                         double[] y = new double[m];
@@ -287,9 +268,11 @@ public class GammaLogLikelihood {
                         it++;
                     }
 
-                    if (it == maxit) {
+                    /*
+                    if (it == maxIt) {
                         System.err.printf("calcB branch %d Warning: max iterations reached with error: %.2f%n", x, err);
                     }
+                     */
 
                     // take last element
                     B[x] = X[m - 1];
@@ -299,10 +282,12 @@ public class GammaLogLikelihood {
     }
 
 
-
     // Function for approximating branch probabilities
-    public static double[] approxB(double a, double b, double d,
-                                 double[] s, double[] e, double[] t0, double[] P0) {
+    public static double[] approxB(double a, int b, double d,
+                                   double[] s, double[] e, double[] t0, double[] P0,
+                                   double tol) {
+
+        // to check: initialize GammaDistribution with shape i*b for i=1,2,... here?
 
         // get number of branches
         assert s.length == e.length; // for each branch, a start and end time must be given
@@ -322,20 +307,29 @@ public class GammaLogLikelihood {
                     double P0_bar = getMean(P0_slice);
 
                     // initialize the approximation
-                    GammaDistribution gammaDist = new GammaDistribution(b, a);
-                    double branch_prob = (1 - d) * gammaDist.density(ex - sx);
-                    double min_num_terms = (ex - sx) / (a * b);
+                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal
+                    double branch_prob = 0;
 
-                    int i = 1;
-                    double update = 1;
-                    while (update > 1e-6 || i <= min_num_terms) {
-                        GammaDistribution newGammaDist = new GammaDistribution((i+1) * b, a);
-                        update = Math.pow(2, i) * Math.pow(1-d, i+1) * Math.pow(P0_bar, i) * newGammaDist.density(ex - sx);
-                        branch_prob += update;
+                    // int num_terms = 0;
+                    int i = k; // increase k
+                    double term = 1;
+                    while (term > tol) {
+                        GammaDistribution gammaDist = new GammaDistribution((i+1) * b, a);
+                        term = Math.pow(2, i) * Math.pow(1-d, i+1) * Math.pow(P0_bar, i) * gammaDist.density(ex - sx); // calculate b_i
+                        branch_prob += term;
                         i++;
+                        // num_terms++;
                     }
-
-                    // take last element
+                    int j = k-1; // decrease k
+                    term = 1;
+                    while (term > tol & j >= 0) {
+                        GammaDistribution gammaDist = new GammaDistribution((j+1) * b, a);
+                        term = Math.pow(2, j) * Math.pow(1-d, j+1) * Math.pow(P0_bar, j) * gammaDist.density(ex - sx); // calculate b_j
+                        branch_prob += term;
+                        j--;
+                        // num_terms++;
+                    }
+                    // System.out.println("branch start " + sx + " end " + ex + " terms " + num_terms);
                     B[x] = branch_prob;
                 });
 
@@ -343,17 +337,11 @@ public class GammaLogLikelihood {
     }
 
 
-
-
     // Function for partial convolution using FFT
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
-        // pad y
-        double[] y_ext = padZeros(y);
-
-        // perform FFT on y_ext
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] fy = fft.transform(y_ext, TransformType.FORWARD);
+        // perform FFT on padded y
+        Complex[] fy = fft.transform(padZeros(y), TransformType.FORWARD);
 
         // element-wise multiplication of fx and fy (convolution in Fourier space)
         Complex[] fz = new Complex[fx.length];
@@ -374,13 +362,11 @@ public class GammaLogLikelihood {
     }
 
 
-    private static double[] padZeros(double[] x) {
+    // Helper method to pad an array with 0 to its double length
+    public static double[] padZeros(double[] x) {
         int n = x.length;
-
-        // extend x
         double[] xp = new double[n * 2];
         System.arraycopy(x, 0, xp, 0, n);
-
         return xp;
     }
 
@@ -389,7 +375,6 @@ public class GammaLogLikelihood {
     private static int findClosestIndex(double[] array, double value) {
         int closestIndex = 0;
         double minDiff = Math.abs(array[0] - value);
-
         for (int i = 1; i < array.length; i++) {
             double diff = Math.abs(array[i] - value);
             if (diff < minDiff) {
@@ -400,6 +385,7 @@ public class GammaLogLikelihood {
         return closestIndex;
     }
 
+
     // Helper method to calculate the mean of an array
     private static double getMean(double[] array) {
         double sum = 0;
@@ -408,27 +394,6 @@ public class GammaLogLikelihood {
         }
         return sum / array.length;
     }
-
-
-    /* redundant calculation for P0 and P1
-    private static Complex[] getPDF(double[] t, double a, double b) {
-        int n = t.length;
-
-        // calculate the PDF of the gamma distribution
-        double[] pdf = new double[n];
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
-        for (int i = 0; i < n; i++) {
-            pdf[i] = gammaDist.density(t[i]);
-        }
-
-        // perform FFT
-        double[] ft = padZeros(pdf);
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex [] Ft = fft.transform(ft, TransformType.FORWARD);
-
-        return Ft;
-    }
-    */
 }
 
 

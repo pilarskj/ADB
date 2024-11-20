@@ -1,7 +1,6 @@
 package adbp;
 
-import beast.base.core.Input;
-import beast.base.core.Log;
+import beast.base.core.*;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
@@ -11,25 +10,35 @@ import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
 
-
+@Description("This model implements an Age-Dependent Branching Process " +
+        "with lifetimes distributed according to a Gamma distribution with integer shape parameter (Erlang distribution), " +
+        "a death probability and extant sampling.")
 public class GammaBranchingModel extends SpeciesTreeDistribution {
+
+    // parametrization
     final public Input<RealParameter> scaleParameterInput =
             new Input<>("scale", "scale parameter of the Gamma distribution", Input.Validate.REQUIRED);
-    final public Input<RealParameter> shapeParameterInput =
-            new Input<>("shape", "shape parameter of the Gamma distribution");
+    final public Input<IntegerParameter> shapeParameterInput =
+            new Input<>("shape", "shape parameter of the Gamma distribution", Input.Validate.REQUIRED);
     final public Input<RealParameter> deathParameterInput =
-            new Input<>("deathprob", "probability of death at branching times");
+            new Input<>("deathprob", "probability of death at branching times (default 0)", new RealParameter("0.0"));
     final public Input<RealParameter> rhoParameterInput =
-            new Input<>("rho", "sampling probability at the end of the process");
+            new Input<>("rho", "sampling probability at the end of the process (default 1)", new RealParameter("1.0"));
     final public Input<RealParameter> originParameterInput =
-            new Input<>("origin", "time of origin of the process");
-    /*
-    // for testing time steps and efficiency
-    final public Input<IntegerParameter> mPInput =
-            new Input<>("mP", "");
-    final public Input<IntegerParameter> mBInput =
-            new Input<>("mB", "");
-    */
+            new Input<>("origin", "time of origin of the process", Input.Validate.REQUIRED);
+
+    // options
+    public Input<Integer> maxIterationsInput =
+            new Input<>("maxIterations", "maximum number of iterations for numerical integration",100);
+    public Input<Double> tolerancePInput =
+            new Input<>("toleranceP", "tolerance for numerical integration of P0 and P1",1e-12);
+    public Input<Double> toleranceBInput =
+            new Input<>("toleranceB", "tolerance for numerical integration of B (branch probabilities)",1e-6);
+    public Input<Integer> stepSizePInput =
+            new Input<>("stepSizeP", "number of time steps for FFT for P0 and P1", (int)Math.pow(2, 14));
+    public Input<Integer> stepSizeBInput =
+            new Input<>("stepSizeB", "number of time steps for FFT for B", (int)Math.pow(2, 12));
+
 
     @Override
     public void initAndValidate() {
@@ -42,33 +51,35 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         }
     }
 
+
     @Override
     public double calculateTreeLogLikelihood(final TreeInterface tree) {
 
+        // parameters
         double a = scaleParameterInput.get().getValue();
-        double b = shapeParameterInput.get().getValue();
+        int b = shapeParameterInput.get().getValue();
         double d = deathParameterInput.get().getValue();
         double rho = rhoParameterInput.get().getValue();
-        double t_or = originParameterInput.get().getValue();
-        //int mP = mPInput.get().getValue();
-        //int mB = mBInput.get().getValue();
+        double origin = originParameterInput.get().getValue();
 
-        return calculateTreeLogLikelihood(tree, a, b, d, rho, t_or); //mP, mB
+        // options
+        int maxIt = maxIterationsInput.get();
+        double tolP = tolerancePInput.get();
+        double tolB = toleranceBInput.get();
+        int mP = stepSizePInput.get();
+        int mB = stepSizeBInput.get();
+
+        return calculateTreeLogLikelihood(tree, a, b, d, rho, origin, maxIt, tolP, tolB, mP, mB);
     }
 
+
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
-                                                final double a, final double b, final double d, final double rho,
-                                                final double t_or) {
-                                                //final int mP, final int mB
+                                                final double a, final int b, final double d, final double rho, final double origin,
+                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB) {
 
         // stop if tree origin is smaller than root height
-        if (tree.getRoot().getHeight() > t_or)
+        if (tree.getRoot().getHeight() > origin)
             return Double.NEGATIVE_INFINITY;
-
-        // set default options for calcLogLikelihood
-        int mP = (int)Math.pow(2, 14);
-        int mB = (int)Math.pow(2, 12);
-        int maxit = 100;
 
         // get branching times from tree
         // create empty arrays to store start and end times of branches
@@ -77,6 +88,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double[] ext_e = new double[0];
 
         // traverse all nodes and compute start/end times of all branches (backwards in time)
+        // alternatively, use Branch/ BranchList classes
         for (int i = 0; i < tree.getNodeCount(); i++) {
             Node node = tree.getNode(i);
 
@@ -86,7 +98,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             double endTime;
             if (node.isRoot()) {
                 // end time is the tree origin
-                endTime = t_or;
+                endTime = origin;
             } else {
                 // end time is the parent node height (i.e., the divergence time of the parent)
                 endTime = node.getParent().getHeight();
@@ -106,9 +118,12 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         }
 
         // calculate LogLikelihood
-        double logL = GammaLogLikelihood.calcLogLikelihood(rho, a, b, d, t_or, int_s, int_e, ext_e, mP, mB, maxit);
+        double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
+                int_s, int_e, ext_e, maxIt, tolP, tolB, mP, mB);
+
         return logL;
     }
+
 
     @Override
     protected boolean requiresRecalculation() {
@@ -119,6 +134,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
                 || rhoParameterInput.get().somethingIsDirty()
                 || originParameterInput.get().somethingIsDirty();
     }
+
 
     @Override
     public boolean canHandleTipDates() {

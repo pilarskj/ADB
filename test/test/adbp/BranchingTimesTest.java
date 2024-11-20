@@ -10,8 +10,6 @@ import beast.base.evolution.tree.Node;
 import feast.fileio.TreeFromNewickFile;
 import org.junit.jupiter.api.Test;
 
-
-
 public class BranchingTimesTest {
 
     @Test
@@ -38,6 +36,7 @@ public class BranchingTimesTest {
             System.out.println("Interval " + i + ": " + interval);
         } // gives waiting times between any event to occur in the tree (not branch lengths!)
     }
+
 
     @Test
     public void testBranchingTimes() {
@@ -77,9 +76,9 @@ public class BranchingTimesTest {
             }
 
             if (node.isLeaf()) {
-                System.out.println(i + " External edge (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
+                System.out.println(i + " External branch (Leaf " + node.getID() + "): Start time = " + startTime + ", End time = " + endTime);
             } else {
-                System.out.println(i + " Internal edge (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
+                System.out.println(i + " Internal branch (Node " + node.getNr() + "): Start time = " + startTime + ", End time = " + endTime);
             }
         }
     }

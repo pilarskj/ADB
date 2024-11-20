@@ -8,6 +8,7 @@
 <map name="Beta" >beast.base.inference.distribution.Beta</map>
 <map name="Gamma" >beast.base.inference.distribution.Gamma</map>
 <map name="LaplaceDistribution" >beast.base.inference.distribution.LaplaceDistribution</map>
+<map name="Poisson" >beast.base.inference.distribution.Poisson</map>
 <map name="prior" >beast.base.inference.distribution.Prior</map>
 <map name="InverseGamma" >beast.base.inference.distribution.InverseGamma</map>
 <map name="OneOnX" >beast.base.inference.distribution.OneOnX</map>
@@ -31,7 +32,7 @@
 <!-- run MCMC -->
 <run id="mcmc" spec="beast.base.inference.MCMC" chainLength="1000000" numInitializationAttempts="100">
 
-  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule"/>
+  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule"/> <!-- Much more efficient? -->
 
   <!-- 1. define state node -->
   <state id="state" spec="beast.base.inference.State" storeEvery="1000">
@@ -63,8 +64,8 @@
     <parameter id="scale" spec="beast.base.inference.parameter.RealParameter"
                name="stateNode" dimension="1" lower="0" upper="Infinity" value="5"/>
 
-    <parameter id="shape" spec="beast.base.inference.parameter.RealParameter"
-               name="stateNode" dimension="1" lower="0" upper="Infinity" value="5"/>
+    <parameter id="shape" spec="beast.base.inference.parameter.IntegerParameter"
+               name="stateNode" dimension="1" lower="1" value="5"/>
 
     <parameter id="deathprob" spec="beast.base.inference.parameter.RealParameter"
                name="stateNode" dimension="1" lower="0" upper="1" value="0.5"/>
@@ -95,7 +96,8 @@
         <LogNormal name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
 
       <prior id="shapePrior" name="distribution" x="@shape">
-        <LogNormal name="distr" M="1" S="1"/></prior> <!-- [0.5, 14] -->
+        <!-- <LogNormal name="distr" M="1" S="1"/></prior> [0.5, 14] -->
+        <Poisson name="distr" lambda="5"/></prior>
 
       <prior id="deathprobPrior" name="distribution" x="@deathprob">
         <Beta name="distr" alpha="2" beta="10"/></prior>
@@ -138,14 +140,18 @@
 
   <!-- phylodynamic operators -->
   <operator id="scaleScaler" spec="feast.operators.SmartScaleOperator"
-            parameter="@scale" scaleFactor="0.8" weight="3.0"/>
-  <operator id="shapeScaler" spec="feast.operators.SmartScaleOperator"
-            parameter="@shape" scaleFactor="0.8" weight="3.0"/>
+            parameter="@scale" scaleFactor="0.8" weight="10.0"/>
+
+  <operator id="shapeUniform" spec="beast.base.inference.operator.IntRandomWalkOperator"
+            parameter="@shape" windowSize="10" weight="10.0"/>
+
   <operator id="deathprobScaler" spec="feast.operators.SmartScaleOperator"
             parameter="@deathprob" scaleFactor="0.8" weight="3.0"/>
+
   <operator id="rhoScaler" spec="feast.operators.SmartScaleOperator"
             parameter="@rho" scaleFactor="0.8" weight="3.0"/>
 
+  <!-- "Attempt to scale Integer parameter shape has no effect"
   <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
     <up idref="scale"/>
     <down idref="shape"/>
@@ -154,21 +160,21 @@
   <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
     <up idref="scale"/>
     <up idref="shape"/>
-  </operator>
+  </operator> -->
 
-  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+  <operator id="deathRhoUpDown" spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
     <up idref="deathprob"/>
     <down idref="rho"/>
   </operator>
 
-  <operator spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
+  <operator id="deathRhoUpUp" spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
     <up idref="deathprob"/>
     <up idref="rho"/>
   </operator>
 
   <!-- 4. define loggers -->
   <!-- trace logger -->
-  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="examples/inference.log" logEvery="1000">
+  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="examples/inference.log" logEvery="100">
     <log idref="posterior"/>
     <log idref="likelihood"/>
     <log idref="prior"/>
@@ -184,7 +190,7 @@
   </logger>
 
   <!-- screen logger -->
-  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="10">
+  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="100">
     <log idref="posterior"/>
     <log id="ESS" spec="beast.base.inference.util.ESS" arg="@posterior"/>
     <log idref="likelihood"/>

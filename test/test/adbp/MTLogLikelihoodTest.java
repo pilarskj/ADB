@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.io.FileWriter;
 import java.util.Arrays;
 
-import static adbp.MTLogLikelihood.calcLogLikelihood;
+import static adbp.MTLogLikelihood.calcMTLogLikelihood;
 
 public class MTLogLikelihoodTest {
 
@@ -55,9 +55,11 @@ public class MTLogLikelihoodTest {
         // int type_or = 0;
 
         // options
-        int m = (int)Math.pow(2, 14);
+        int maxIt = 100;
+        double tolP = 1e-12;
+        double tolB = 1e-6;
+        int mP = (int)Math.pow(2, 14);
         int mB = (int)Math.pow(2, 12);
-        int maxit = 100;
 
         // get branches
         BranchList branches = new BranchList(tree, t_or, true);
@@ -99,8 +101,8 @@ public class MTLogLikelihoodTest {
         System.out.println(Arrays.toString(ext_e));
         */
 
-        double logL = calcLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e,
-                left_child, right_child, m, mB, maxit);
+        double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e, left_child, right_child,
+                maxIt, tolP, tolB, mP, mB);
 
         System.out.println(logL);
     }
@@ -126,9 +128,11 @@ public class MTLogLikelihoodTest {
                 {0.1, 0.5}};
 
         // options
-        int m = (int)Math.pow(2, 14);
+        int maxIt = 100;
+        double tolP = 1e-12;
+        double tolB = 1e-6;
+        int mP = (int)Math.pow(2, 14);
         int mB = (int)Math.pow(2, 12);
-        int maxit = 100;
 
         // get branches
         BranchList branches = new BranchList(tree, t_or, true);
@@ -170,8 +174,8 @@ public class MTLogLikelihoodTest {
                 double rho = i; //, new double[]{i, j};
                 System.out.println(rho); //Arrays.toString(a));
                 try {
-                    double logL = calcLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e,
-                            left_child, right_child, m, mB, maxit);
+                    double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e, left_child, right_child,
+                            maxIt, tolP, tolB, mP, mB);
                     writer.write(i + "," + logL + "\n"); //+ j + ","
                 } catch (Exception e) {
                     writer.write(i + "," + "\n"); //+ j + ","
