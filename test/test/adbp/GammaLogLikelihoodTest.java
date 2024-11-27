@@ -20,9 +20,9 @@ public class GammaLogLikelihoodTest {
         double origin = 12;
 
         // branch lengths for tree = "((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;"
-        double [] int_s = { 5, 8, 11 };
-        double [] int_e = { 11, 11, 12 };
-        double [] ext_e = { 5, 5, 8, 8 };
+        double [] intS = { 5, 8, 11 };
+        double [] intE = { 11, 11, 12 };
+        double [] extE = { 5, 5, 8, 8 };
 
         // computational options
         int maxIt = 100;
@@ -31,7 +31,7 @@ public class GammaLogLikelihoodTest {
         int mP = (int)Math.pow(2, 14);
         int mB = (int)Math.pow(2, 12);
 
-        double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin, int_s, int_e, ext_e,
+        double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin, intS, intE, extE,
                 maxIt, tolP, tolB, mP, mB, false);
         System.out.println(logL);
 

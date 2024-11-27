@@ -51,19 +51,21 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         if (!TreeUtils.isUltrametric(tree)) {
             Log.warning.println("WARNING: This model (tree prior) cannot handle dated tips.");
         }
-        // Ugne: mP and mB should always be power of 2 (per your comment elsewhere).
-        // I would add a check for this here. For example:
-        // if (!isPowerOfTwo(stepSizePInput.get())) {
-        //        throw new IllegalArgumentException("stepSizeP must be a power of 2");
-        //    }
-        //
-        // if (!isPowerOfTwo(stepSizeBInput.get())) {
-        //        throw new IllegalArgumentException("stepSizeB must be a power of 2");
-        //    }
-        // where
-        // private boolean isPowerOfTwo(int x) {
-        //      return (x > 0) && ((x & (x - 1)) == 0); // https://stackoverflow.com/questions/600293/how-to-check-if-a-number-is-a-power-of-2
-        // }
+
+        // check that step sizes are power of 2 (required for FFT)
+        if (!isPowerOfTwo(stepSizePInput.get())) {
+            throw new IllegalArgumentException("stepSizeP must be a power of 2");
+        }
+
+        if (!isPowerOfTwo(stepSizeBInput.get())) {
+            throw new IllegalArgumentException("stepSizeB must be a power of 2");
+        }
+    }
+
+
+    // Helper method to check if number is a power if two
+    private boolean isPowerOfTwo(int x) {
+        return (x > 0) && ((x & (x - 1)) == 0); // https://stackoverflow.com/questions/600293/how-to-check-if-a-number-is-a-power-of-2
     }
 
 
@@ -99,9 +101,9 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
         // get branching times from tree
         // create empty arrays to store start and end times of branches
-        double[] int_s = new double[0];
-        double[] int_e = new double[0];
-        double[] ext_e = new double[0];
+        double[] intS = new double[0];
+        double[] intE = new double[0];
+        double[] extE = new double[0];
 
         // traverse all nodes and compute start/end times of all branches (backwards in time)
         // alternatively, use Branch/ BranchList classes
@@ -123,19 +125,19 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             // if node is a tip, add times to external branches, otherwise, add to internal branches
             if (node.isLeaf()) {
                 assert startTime == 0; // tips should have height 0
-                ext_e = Arrays.copyOf(ext_e, ext_e.length + 1);
-                ext_e[ext_e.length - 1] = endTime;
+                extE = Arrays.copyOf(extE, extE.length + 1);
+                extE[extE.length - 1] = endTime;
             } else {
-                int_s = Arrays.copyOf(int_s, int_s.length + 1);
-                int_e = Arrays.copyOf(int_e, int_e.length + 1);
-                int_s[int_s.length - 1] = startTime;
-                int_e[int_e.length - 1] = endTime;
+                intS = Arrays.copyOf(intS, intS.length + 1);
+                intE = Arrays.copyOf(intE, intE.length + 1);
+                intS[intS.length - 1] = startTime;
+                intE[intE.length - 1] = endTime;
             }
         }
 
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
-                int_s, int_e, ext_e, maxIt, tolP, tolB, mP, mB, approx);
+                intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx);
 
         return logL;
     }

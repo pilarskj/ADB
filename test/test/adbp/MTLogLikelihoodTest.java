@@ -69,18 +69,18 @@ public class MTLogLikelihoodTest {
         int n_ext = branches.countExternalBranches();
         // System.out.println(n_int + " internal and " + n_ext + " external branches");
 
-        double[] int_s = new double[n_int];
-        double[] int_e = new double[n_int];
+        double[] intS = new double[n_int];
+        double[] intE = new double[n_int];
         int[] left_child = new int[n_int];
         int[] right_child = new int[n_int];
-        double[] ext_e = new double[n_ext];
+        double[] extE = new double[n_ext];
         int[] types = new int[n_int + n_ext];
 
         // collect info for internal branches
         for (int i = 0; i < n_int; i++) {
             Branch branch = branches.getBranchByIndex(i);
-            int_s[i] = branch.startTime;
-            int_e[i] = branch.endTime;
+            intS[i] = branch.startTime;
+            intE[i] = branch.endTime;
             left_child[i] = branch.leftIndex;
             right_child[i] = branch.rightIndex;
             types[i] = branch.nodeType;
@@ -89,19 +89,19 @@ public class MTLogLikelihoodTest {
         // collect end times for external branches
         for (int i = 0; i < n_ext; i++) {
             Branch branch = branches.getBranchByIndex(i + n_int);
-            ext_e[i] = branch.endTime;
+            extE[i] = branch.endTime;
             types[i + n_int] = branch.nodeType;
         }
 
         /*
-        System.out.println(Arrays.toString(int_s));
-        System.out.println(Arrays.toString(int_e));
+        System.out.println(Arrays.toString(intS));
+        System.out.println(Arrays.toString(intE));
         System.out.println(Arrays.toString(left_child));
         System.out.println(Arrays.toString(right_child));
-        System.out.println(Arrays.toString(ext_e));
+        System.out.println(Arrays.toString(extE));
         */
 
-        double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e, left_child, right_child,
+        double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, intS, intE, extE, left_child, right_child,
                 maxIt, tolP, tolB, mP, mB);
 
         System.out.println(logL);
@@ -139,18 +139,18 @@ public class MTLogLikelihoodTest {
         int n_int = branches.countInternalBranches();
         int n_ext = branches.countExternalBranches();
 
-        double[] int_s = new double[n_int];
-        double[] int_e = new double[n_int];
+        double[] intS = new double[n_int];
+        double[] intE = new double[n_int];
         int[] left_child = new int[n_int];
         int[] right_child = new int[n_int];
-        double[] ext_e = new double[n_ext];
+        double[] extE = new double[n_ext];
         int[] types = new int[n_int + n_ext];
 
         // collect info for internal branches
         for (int i = 0; i < n_int; i++) {
             Branch branch = branches.getBranchByIndex(i);
-            int_s[i] = branch.startTime;
-            int_e[i] = branch.endTime;
+            intS[i] = branch.startTime;
+            intE[i] = branch.endTime;
             left_child[i] = branch.leftIndex;
             right_child[i] = branch.rightIndex;
             types[i] = branch.nodeType;
@@ -159,7 +159,7 @@ public class MTLogLikelihoodTest {
         // collect end times for external branches
         for (int i = 0; i < n_ext; i++) {
             Branch branch = branches.getBranchByIndex(i + n_int);
-            ext_e[i] = branch.endTime;
+            extE[i] = branch.endTime;
             types[i + n_int] = branch.nodeType;
         }
 
@@ -174,7 +174,7 @@ public class MTLogLikelihoodTest {
                 double rho = i; //, new double[]{i, j};
                 System.out.println(rho); //Arrays.toString(a));
                 try {
-                    double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, int_s, int_e, ext_e, left_child, right_child,
+                    double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_as, Xsi_s, t_or, types, intS, intE, extE, left_child, right_child,
                             maxIt, tolP, tolB, mP, mB);
                     writer.write(i + "," + logL + "\n"); //+ j + ","
                 } catch (Exception e) {

@@ -29,7 +29,7 @@ public class MTLogLikelihood {
     public static double calcMTLogLikelihood(double[] a, double[] b, double[] d, double rho,
                                              double[][] Xsi_as, double[][] Xsi_s,
                                              double t_or, int[] types, //int type_or,
-                                             double[] int_s, double[] int_e, double[] ext_e,
+                                             double[] intS, double[] intE, double[] extE,
                                              int[] left_child, int[] right_child,
                                              int maxIt, double tolP, double tolB, int mP, int mB) {
 
@@ -39,20 +39,20 @@ public class MTLogLikelihood {
         assert d.length == ntypes;
 
         // get number of tips
-        int ntips = ext_e.length;
+        int ntips = extE.length;
 
         // generate linearly spaced values between 0 and origin
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
-        double[] t_seq = new double[m];
+        double[] tSeq = new double[m];
         double dx = t_or / m;
         for (int i = 0; i < m; i++) {
-            t_seq[i] = dx * (i + 1);
+            tSeq[i] = dx * (i + 1);
         }
-        assert t_seq[m - 1] == t_or;
+        assert tSeq[m - 1] == t_or;
 
         // calculate CDF and FFT from PDF from 0 to origin
         double[][] cdf = new double[m][ntypes];
-        Complex[][] pdf_FFT = new Complex[m*2][ntypes];
+        Complex[][] pdfFFT = new Complex[m*2][ntypes];
         IntStream.range(0, ntypes)
                 .parallel()
                 .forEach(x -> {
@@ -60,25 +60,25 @@ public class MTLogLikelihood {
                     double[] pdf = new double[m];
                     GammaDistribution gammaDist = new GammaDistribution(b[x], a[x]);
                     for (int i = 0; i < m; i++) {
-                        pdf[i] = gammaDist.density(t_seq[i]);
-                        cdf[i][x] = gammaDist.cumulativeProbability(t_seq[i]);
+                        pdf[i] = gammaDist.density(tSeq[i]);
+                        cdf[i][x] = gammaDist.cumulativeProbability(tSeq[i]);
                     }
 
                     // perform FFT
                     Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
                     for (int i = 0; i < m*2; i++) {
-                        pdf_FFT[i][x] = Ft[i];
+                        pdfFFT[i][x] = Ft[i];
                     }
                 });
 
         // calculate extinction probability over time
-        double[][] P0 = calcMTP0(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, t_seq, dx, maxIt, tolP);
+        double[][] P0 = calcMTP0(pdfFFT, cdf, d, rho, Xsi_as, Xsi_s, tSeq, dx, maxIt, tolP);
 
         // calculate probability of single descendants at tips
-        double[][] P1 = calcMTP1(pdf_FFT, cdf, d, rho, Xsi_as, Xsi_s, ext_e, t_seq, P0, dx, maxIt, tolP);
+        double[][] P1 = calcMTP1(pdfFFT, cdf, d, rho, Xsi_as, Xsi_s, extE, tSeq, P0, dx, maxIt, tolP);
 
         // calculate probabilities of internal branches
-        double[][] B = calcMTB(a, b, d, Xsi_as, Xsi_s, int_s, int_e, t_seq, P0, maxIt, tolB, mB);
+        double[][] B = calcMTB(a, b, d, Xsi_as, Xsi_s, intS, intE, tSeq, P0, maxIt, tolB, mB);
         // System.out.println(Arrays.deepToString(B));
 
         // start recursion
@@ -174,7 +174,7 @@ public class MTLogLikelihood {
 
 
     // Function for calculating the extinction probability
-    public static double[][] calcMTP0(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
+    public static double[][] calcMTP0(Complex[][] pdfFFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
                                       double[] t, double dx, int maxIt, double tol) {
 
         // get number of types and time steps
@@ -209,7 +209,7 @@ public class MTLogLikelihood {
                 // extract column from the pdf matrix
                 Complex[] Ft = new Complex[m*2];
                 for (int i = 0; i < m*2; i++) {
-                    Ft[i] = pdf_FFT[i][j];
+                    Ft[i] = pdfFFT[i][j];
                 }
 
                 // partially convolve
@@ -238,8 +238,8 @@ public class MTLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    public static double[][] calcMTP1(Complex[][] pdf_FFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
-                                      double[] ext_t, double[] t0, double[][] P0, double dx, int maxIt, double tol) {
+    public static double[][] calcMTP1(Complex[][] pdfFFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
+                                      double[] extT, double[] t0, double[][] P0, double dx, int maxIt, double tol) {
 
         // get number of types and time steps
         int n = cdf[0].length;
@@ -274,7 +274,7 @@ public class MTLogLikelihood {
                 // extract column from the pdf matrix
                 Complex[] Ft = new Complex[m*2];
                 for (int i = 0; i < m*2; i++) {
-                    Ft[i] = pdf_FFT[i][j];
+                    Ft[i] = pdfFFT[i][j];
                 }
 
                 // partially convolve
@@ -299,7 +299,7 @@ public class MTLogLikelihood {
         }
 
         // interpolate: evaluate at tip times
-        int ntips = ext_t.length;
+        int ntips = extT.length;
         double[][] P1 = new double[ntips][n];
 
         for (int j = 0; j < n; j++) {
@@ -311,7 +311,7 @@ public class MTLogLikelihood {
             UnivariateFunction function = interpolator.interpolate(t0, Xj);
 
             for (int i = 0; i < ntips; i++) {
-                P1[i][j] = function.value(ext_t[i]);
+                P1[i][j] = function.value(extT[i]);
             }
         }
 
@@ -353,17 +353,17 @@ public class MTLogLikelihood {
                     double ex = e[x]; // end of the branch
 
                     // generate linearly spaced values between start and end
-                    double[] t_seq = new double[m];
+                    double[] tSeq = new double[m];
                     double[] age_seq = new double[m];
                     double dx = (ex - sx) / m;
                     for (int i = 0; i < m; i++) {
-                        t_seq[i] = sx + dx * (i + 1);
-                        age_seq[i] = t_seq[i] - sx;
+                        tSeq[i] = sx + dx * (i + 1);
+                        age_seq[i] = tSeq[i] - sx;
                     }
-                    assert t_seq[m - 1] == ex;
+                    assert tSeq[m - 1] == ex;
 
                     // calculate the FFT from PDF of the gamma distribution and interpolate P0 per type, initialize matrix
-                    Complex[][] pdf_FFT = new Complex[m*2][ntypes];
+                    Complex[][] pdfFFT = new Complex[m*2][ntypes];
                     double[][] P = new double[m][ntypes];
                     double[][] X0 = new double[m][ntypes];
 
@@ -372,14 +372,14 @@ public class MTLogLikelihood {
                         GammaDistribution gammaDist = new GammaDistribution(b[j], a[j]);
                         for (int i = 0; i < m; i++) {
                             pdf[i] = gammaDist.density(age_seq[i]); // get density
-                            P[i][j] = functions.get(j).value(t_seq[i]); // interpolate P0
+                            P[i][j] = functions.get(j).value(tSeq[i]); // interpolate P0
                             X0[i][j] = (1 - d[j]) * pdf[i]; // initalize matrix
                         }
 
                         // perform FFT
                         Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
                         for (int i = 0; i < m*2; i++) {
-                            pdf_FFT[i][j] = Ft[i];
+                            pdfFFT[i][j] = Ft[i];
                         }
                     }
 
@@ -406,7 +406,7 @@ public class MTLogLikelihood {
                             // extract column from the pdf matrix
                             Complex[] Ft = new Complex[m * 2];
                             for (int i = 0; i < m * 2; i++) {
-                                Ft[i] = pdf_FFT[i][j];
+                                Ft[i] = pdfFFT[i][j];
                             }
 
                             // partially convolve

@@ -15,7 +15,7 @@ source('sample_types.R')
 #' @param Xsi_as matrix of asymetric type transition probabilities
 #' @param Xsi_s matrix of symetric type transition probabilities
 #' @param rho sampling probability 
-simulate_phylogeny <- function(ntaxa, a, b, d = 0, origin_type = 0, Xsi_as = matrix(0), Xsi_s = matrix(1), rho = 1) {
+simulate_phylogeny <- function(ntaxa, a, b, d = 0, rho = 1, origin_type = 0, Xsi_as = matrix(0), Xsi_s = matrix(1)) {
   # assert that all inputs are correct
   ntypes = length(a)
   assert_that(all(c(length(b) == ntypes, length(d) == ntypes, 
