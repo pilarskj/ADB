@@ -38,6 +38,8 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("stepSizeP", "number of time steps for FFT for P0 and P1", (int)Math.pow(2, 14));
     public Input<Integer> stepSizeBInput =
             new Input<>("stepSizeB", "number of time steps for FFT for B", (int)Math.pow(2, 12));
+    public Input<Boolean> approxInput =
+            new Input<>("approx", "approximate branch probabilities (default true)", true);
 
 
     @Override
@@ -81,14 +83,15 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double tolB = toleranceBInput.get();
         int mP = stepSizePInput.get();
         int mB = stepSizeBInput.get();
+        boolean approx = approxInput.get();
 
-        return calculateTreeLogLikelihood(tree, a, b, d, rho, origin, maxIt, tolP, tolB, mP, mB);
+        return calculateTreeLogLikelihood(tree, a, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
     }
 
 
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
                                                 final double a, final int b, final double d, final double rho, final double origin,
-                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB) {
+                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB, final boolean approx) {
 
         // stop if tree origin is smaller than root height
         if (tree.getRoot().getHeight() > origin)
@@ -132,7 +135,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
-                int_s, int_e, ext_e, maxIt, tolP, tolB, mP, mB);
+                int_s, int_e, ext_e, maxIt, tolP, tolB, mP, mB, approx);
 
         return logL;
     }

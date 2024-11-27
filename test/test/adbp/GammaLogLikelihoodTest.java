@@ -32,7 +32,7 @@ public class GammaLogLikelihoodTest {
         int mB = (int)Math.pow(2, 12);
 
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin, int_s, int_e, ext_e,
-                maxIt, tolP, tolB, mP, mB);
+                maxIt, tolP, tolB, mP, mB, false);
         System.out.println(logL);
 
         assertEquals(logL, -26.91385,  0.05);

@@ -29,7 +29,7 @@ public class GammaLogLikelihood {
     // Main function for calculating the likelihood of the tree
     public static double calcLogLikelihood(double a, int b, double d, double rho, double origin,
                                            double[] int_s, double[] int_e, double[] ext_e,
-                                           int maxIt, double tolP, double tolB, int mP, int mB) {
+                                           int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b, a);
 
@@ -59,8 +59,12 @@ public class GammaLogLikelihood {
         double[] P1 = calcP1(pdf_FFT, cdf, P0, d, rho, ext_e, t_seq, dx, maxIt, tolP);
 
         // calculate probabilities of internal branches
-        // double[] B = calcB(a, b, d, int_s, int_e, t_seq, P0, maxIt, tolB, mB);
-        double[] B = approxB(a, b, d, int_s, int_e, t_seq, P0, tolB);
+        double[] B;
+        if (approx) {
+            B = approxB(a, b, d, int_s, int_e, t_seq, P0, tolB);
+        } else {
+            B = calcB(a, b, d, int_s, int_e, t_seq, P0, maxIt, tolB, mB);
+        }
 
         // make log and sum
         double logP1 = 0;
