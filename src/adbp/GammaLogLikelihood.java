@@ -19,6 +19,9 @@ and for calculating the likelihood of a tree based on the parameters and branchi
 public class GammaLogLikelihood {
 
     // can those be initialized once and re-used?
+    // Ugne: These three don't store any data or take any input (assuming that fft should always be standard), so they can be reused.
+    // In general, you have to be careful about this. If you have a class that stores data or takes input, you have to be careful about reusing it.
+    // I am not sure why they are public.
     public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
     public static EuclideanDistance norm = new EuclideanDistance();
     public static LinearInterpolator interpolator = new LinearInterpolator();
@@ -32,6 +35,7 @@ public class GammaLogLikelihood {
 
         // generate linearly spaced values between 0 and origin
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
+
         double[] t_seq = new double[m];
         double dx = origin / m;
         for (int i = 0; i < m; i++) {
@@ -186,6 +190,11 @@ public class GammaLogLikelihood {
         return P1;
     }
 
+    // Ugne: if you will do some comparisons of exact vs approx results for the paper,
+    // it may make sense to have a separate class for the approximations.
+    // Or maybe even better, take a flag parameter as input which would determine if approx or exact calculation should be done.
+    // This would allow to choose which version is used in XML already and ensure reproducibility better.
+    // If you only use the exact version for unit testing, it is ok as is, I think.
 
     // Function for calculating branch probabilities
     public static double[] calcB(double a, int b, double d,
@@ -288,6 +297,12 @@ public class GammaLogLikelihood {
                                    double tol) {
 
         // to check: initialize GammaDistribution with shape i*b for i=1,2,... here?
+        // Ugne: you could use cashing to avoid creating a new GammaDistribution object for each iteration.
+        // Basically create a map where you store the distributions for each i and reuse them.
+        // If you know the maximum i you will need, you can precompute them all and store them in a list.
+        // If you don't know the maximum i, whenever you need gammaDist for particular i, you can use a map and check
+        // if the distribution for i is already computed. And if not, you compute it and store it in the map.
+
 
         // get number of branches
         assert s.length == e.length; // for each branch, a start and end time must be given
@@ -301,6 +316,15 @@ public class GammaLogLikelihood {
                 .forEach(x -> {
                     double sx = s[x]; // start of the branch
                     double ex = e[x]; // end of the branch
+
+                    // Ugne: Below you could use binary search instead of loop in the findClosestIndex method.
+                    // This would make the complexity of the method log(n) instead of n.
+                    // But you need to sort t0 array first, which would be an additional step.
+                    // If you have a lot of branches and the t0 array is long, it may be worth it.
+                    // Then you can sort it once, before repeatedly using in this stream.
+                    // Be careful to check if sorting this array does not affect some dependent calculations.
+                    // Otherwise, if looping is actually faster, you may change the method to find the closest index for two doubles at the same time.
+                    // Since you anyway need to loop through all t0, you could find both indices for sx and ex at the same time.
 
                     // get average P0 over branch
                     double[] P0_slice = Arrays.copyOfRange(P0, findClosestIndex(t0, sx), findClosestIndex(t0, ex) + 1);

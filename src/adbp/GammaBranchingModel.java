@@ -49,6 +49,19 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         if (!TreeUtils.isUltrametric(tree)) {
             Log.warning.println("WARNING: This model (tree prior) cannot handle dated tips.");
         }
+        // Ugne: mP and mB should always be power of 2 (per your comment elsewhere).
+        // I would add a check for this here. For example:
+        // if (!isPowerOfTwo(stepSizePInput.get())) {
+        //        throw new IllegalArgumentException("stepSizeP must be a power of 2");
+        //    }
+        //
+        // if (!isPowerOfTwo(stepSizeBInput.get())) {
+        //        throw new IllegalArgumentException("stepSizeB must be a power of 2");
+        //    }
+        // where
+        // private boolean isPowerOfTwo(int x) {
+        //      return (x > 0) && ((x & (x - 1)) == 0); // https://stackoverflow.com/questions/600293/how-to-check-if-a-number-is-a-power-of-2
+        // }
     }
 
 
