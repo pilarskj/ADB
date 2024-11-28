@@ -1,5 +1,6 @@
 package adbp;
 
+import beast.base.core.Log;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -10,6 +11,7 @@ import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 /*
@@ -128,11 +130,11 @@ public class GammaLogLikelihood {
             it++;
         }
 
-        /* for asserting convergence
+        // for asserting convergence
         if (it == maxIt) {
-            System.err.printf("calcP0 Warning: max iterations reached with error: %.2f%n", err); // check if error is huge!
+            // print error in debug mode
+            Log.debug.println("calcP0: max iterations reached with error:  " + err);
         }
-         */
 
         return X;
     }
@@ -182,11 +184,9 @@ public class GammaLogLikelihood {
             it++;
         }
 
-        /*
         if (it == maxIt) {
-            System.err.printf("calcP1 Warning: max iterations reached with error: %.2f%n", err);
+            Log.debug.println("calcP1: max iterations reached with error:  " + err);
         }
-         */
 
         // interpolate
         UnivariateFunction function = interpolator.interpolate(tSeq, X);
@@ -272,7 +272,6 @@ public class GammaLogLikelihood {
                         }
 
                         // compute error
-                        EuclideanDistance norm = new EuclideanDistance();
                         err = norm.compute(X, Xi);
 
                         // update
@@ -280,11 +279,9 @@ public class GammaLogLikelihood {
                         it++;
                     }
 
-                    /*
                     if (it == maxIt) {
-                        System.err.printf("calcB branch %d Warning: max iterations reached with error: %.2f%n", x, err);
+                        Log.debug.println("calcB: max iterations reached with error:  " + err);
                     }
-                     */
 
                     // take last element
                     B[x] = X[m - 1];
@@ -299,13 +296,11 @@ public class GammaLogLikelihood {
                                    double[] s, double[] e, double[] t0, double[] P0,
                                    double tol) {
 
-        // to check: initialize GammaDistribution with shape i*b for i=1,2,... here?
-        // Ugne: you could use cashing to avoid creating a new GammaDistribution object for each iteration.
-        // Basically create a map where you store the distributions for each i and reuse them.
-        // If you know the maximum i you will need, you can precompute them all and store them in a list.
-        // If you don't know the maximum i, whenever you need gammaDist for particular i, you can use a map and check
-        // if the distribution for i is already computed. And if not, you compute it and store it in the map.
-        
+        // use cashing to avoid creating a new GammaDistribution object with shape i*b for i=1,2,... in each iteration
+        // create a map to store the distributions for each i (once needed) and re-use them
+        // use a thread-safe and dynamic Map
+        ConcurrentHashMap<Integer, GammaDistribution> gammaCache = new ConcurrentHashMap<>();
+
         // get number of branches
         assert s.length == e.length; // for each branch, a start and end time must be given
         int n = s.length;
@@ -319,44 +314,48 @@ public class GammaLogLikelihood {
                     double sx = s[x]; // start of the branch
                     double ex = e[x]; // end of the branch
 
-                    // Ugne: Below you could use binary search instead of loop in the findClosestIndex method.
-                    // This would make the complexity of the method log(n) instead of n.
-                    // But you need to sort t0 array first, which would be an additional step.
-                    // If you have a lot of branches and the t0 array is long, it may be worth it.
-                    // Then you can sort it once, before repeatedly using in this stream.
-                    // Be careful to check if sorting this array does not affect some dependent calculations.
-                    // Otherwise, if looping is actually faster, you may change the method to find the closest index for two doubles at the same time.
-                    // Since you anyway need to loop through all t0, you could find both indices for sx and ex at the same time.
-
                     // get average P0 over branch
+                    // use binary search to find closest indices to the branch lengths in t0 (t0 is sorted per definition!)
                     double[] P0Slice = Arrays.copyOfRange(P0, findClosestIndex(t0, sx), findClosestIndex(t0, ex) + 1);
                     double P0M = getMean(P0Slice);
 
                     // initialize the approximation
                     int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal
-                    double branch_prob = 0;
+                    double branchProb = 0;
 
                     // int num_terms = 0;
                     int i = k; // increase k
                     double term = 1;
                     while (term > tol) {
-                        GammaDistribution gammaDist = new GammaDistribution((i+1) * b, a);
+                        GammaDistribution gammaDist;
+                        // check if GammaDistribution with the given shape is already in the cache
+                        if (gammaCache.containsKey(i+1)) {
+                            gammaDist = gammaCache.get(i+1);
+                        } else { // otherwise, add it
+                            gammaDist = new GammaDistribution((i+1) * b, a);
+                            gammaCache.put(i+1, gammaDist);
+                        }
                         term = Math.pow(2, i) * Math.pow(1-d, i+1) * Math.pow(P0M, i) * gammaDist.density(ex - sx); // calculate b_i
-                        branch_prob += term;
+                        branchProb += term;
                         i++;
-                        // num_terms++;
                     }
                     int j = k-1; // decrease k
                     term = 1;
                     while (term > tol & j >= 0) {
-                        GammaDistribution gammaDist = new GammaDistribution((j+1) * b, a);
+                        GammaDistribution gammaDist;
+                        // check if GammaDistribution with the given shape is already in the cache
+                        if (gammaCache.containsKey(j+1)) {
+                            gammaDist = gammaCache.get(j+1);
+                        } else { // otherwise, add it
+                            gammaDist = new GammaDistribution((j+1) * b, a);
+                            gammaCache.put(j+1, gammaDist);
+                        }
                         term = Math.pow(2, j) * Math.pow(1-d, j+1) * Math.pow(P0M, j) * gammaDist.density(ex - sx); // calculate b_j
-                        branch_prob += term;
+                        branchProb += term;
                         j--;
-                        // num_terms++;
                     }
-                    // System.out.println("branch start " + sx + " end " + ex + " terms " + num_terms);
-                    B[x] = branch_prob;
+
+                    B[x] = branchProb;
                 });
 
         return B;
@@ -397,18 +396,29 @@ public class GammaLogLikelihood {
     }
 
 
-    // Helper method to find the index of the closest value in the array
-    private static int findClosestIndex(double[] array, double value) {
-        int closestIndex = 0;
-        double minDiff = Math.abs(array[0] - value);
-        for (int i = 1; i < array.length; i++) {
-            double diff = Math.abs(array[i] - value);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestIndex = i;
+    // Helper method to find the index of the closest value in a sorted array using binary search
+    // https://stackoverflow.com/questions/30245166/find-the-nearest-closest-value-in-a-sorted-list
+    // complexity log(n) instead of n in a loop
+    public static int findClosestIndex(double[] array, double value) {
+        // if value is at boundaries
+        if (value <= array[0]) { return 0; }
+        if (value >= array[array.length - 1]) { return array.length - 1; }
+
+        // do binary search
+        int index = Arrays.binarySearch(array, value);
+
+        if (index >= 0) { // exact match found
+            return index;
+        } else { // no exact match: binarySearch returns (-(insertion point) - 1)
+            int insertionPoint = -(index + 1);
+
+            // return the index of the closest value
+            if ((value - array[insertionPoint - 1]) <= (array[insertionPoint] - value)) { // value is closer to the previous value
+                return insertionPoint - 1;
+            } else { // value is closer to the next value
+                return insertionPoint;
             }
         }
-        return closestIndex;
     }
 
 

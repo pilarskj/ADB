@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
+import static adbp.GammaLogLikelihood.findClosestIndex;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GammaLogLikelihoodTest {
@@ -36,6 +37,18 @@ public class GammaLogLikelihoodTest {
         System.out.println(logL);
 
         assertEquals(logL, -26.91385,  0.05);
+    }
+
+    @Test
+    public void testFindClosestIndex() {
+
+        double[] array = {1, 1.5, 3, 4.5, 6, 7.5, 9};
+        double x = 0.5;
+        double y = 10;
+
+        int ix = findClosestIndex(array, x);
+        int iy = findClosestIndex(array, y);
+        System.out.println(ix + " " + iy);
     }
 }
 
