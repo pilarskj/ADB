@@ -32,7 +32,7 @@
 <!-- run MCMC -->
 <run id="mcmc" spec="beast.base.inference.MCMC" chainLength="1000000" numInitializationAttempts="100">
 
-  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule"/> <!-- Much more efficient? -->
+  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule"/> <!-- by default autoOptimize -->
 
   <!-- 1. define state node -->
   <state id="state" spec="beast.base.inference.State" storeEvery="1000">
@@ -165,11 +165,6 @@
   <operator id="deathRhoUpDown" spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
     <up idref="deathprob"/>
     <down idref="rho"/>
-  </operator>
-
-  <operator id="deathRhoUpUp" spec="beast.base.inference.operator.UpDownOperator" scaleFactor="0.8" weight="10.0">
-    <up idref="deathprob"/>
-    <up idref="rho"/>
   </operator>
 
   <!-- 4. define loggers -->

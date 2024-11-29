@@ -36,6 +36,12 @@ public class GammaLogLikelihood {
     public static double calcLogLikelihood(double a, int b, double d, double rho, double origin,
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
+
+        // use much simpler calculation for BDS case
+        if (b == 1 && d != 0.5) {
+            return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
+        }
+
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b, a);
 
@@ -429,6 +435,45 @@ public class GammaLogLikelihood {
             sum += num;
         }
         return sum / array.length;
+    }
+
+
+    // Simpler function for calculating the log likelihood of a birth-death-sampling tree (Stadler, JTB 2010)
+    public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
+                                             double[] intS, double[] extE) {
+
+        // get birth and death rate
+        double lambda = (1-d) / a;
+        double mu = d / a;
+
+        // get all bifurcation times
+        double[] t = new double[intS.length + 1];
+        System.arraycopy(intS, 0, t, 0, intS.length);
+        t[t.length - 1] = origin;
+
+        // get branch probabilities (no sampling through time)
+        double c1 = lambda - mu;
+        double c2 = - (lambda-mu - 2*lambda*rho) / c1;
+        double[] B = new double[t.length];
+        IntStream.range(0, t.length)
+                .parallel()
+                .forEach(i -> {
+                    B[i] = 2 * (1 - Math.pow(c2, 2)) +
+                            Math.exp(-c1*t[i]) * Math.pow(1-c2, 2) +
+                            Math.exp(c1*t[i]) * Math.pow(1+c2, 2);
+                });
+
+        // make log and sum
+        double logB = 0;
+        for (int i = 0; i < B.length; i++) {
+            logB += Math.log(B[i]);
+        }
+
+        // get log likelihood
+        int n = extE.length; // number of tips
+        double logL = (n-1) * Math.log(lambda) + n * Math.log(4*rho) - logB;
+
+        return logL;
     }
 }
 
