@@ -4,7 +4,6 @@ library(dplyr)
 library(assertthat)
 library(ggtree) # for plotting
 
-source('sample_types.R')
 
 #' Simulator of a phylogeny from an Age-Dependent Branching Process for a fixed time interval (since origin)
 #' @param origin_time time of birth of the initial particle
@@ -49,6 +48,7 @@ simulate_phylogeny <- function(origin_time, a, b, d = 0, rho = 1, origin_type = 
     return(NULL)
   }
   phylogeny = drop.tip(phylogeny, tips[!sampled_tips])
+  phylogeny@phylo$tip.label = as.character(c(1:length(phylogeny@phylo$tip.label)))
   
   # remove height from data for exporting tree
   phylogeny@data = phylogeny@data %>% select(-status)
@@ -167,6 +167,30 @@ simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xs
   tree@data = types
   
   return(tree)
+}
+
+
+# Helper function for simulators of ADBP for sampling types of offspring upon division
+sample_types <- function(parent_type, Xsi_as, Xsi_s) {
+  ntypes = ncol(Xsi_s)
+  
+  cum_prob = 0
+  for (i in seq(0, ntypes - 1)) {
+    # symmetric case
+    cum_prob = cum_prob + Xsi_s[parent_type + 1, i + 1];
+    if (runif(1) < cum_prob) {
+      return(c(i, i))
+    }
+    # asymmetric case
+    cum_prob = cum_prob + 2*Xsi_as[parent_type + 1, i + 1];
+    if (runif(1) < cum_prob) {
+      if (runif(1) < 0.5) {
+        return(c(parent_type, i))
+      } else {
+        return(c(i, parent_type))
+      }
+    }
+  }
 }
 
 

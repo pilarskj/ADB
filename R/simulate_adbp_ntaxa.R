@@ -4,7 +4,6 @@ library(dplyr)
 library(assertthat)
 library(ggtree) # for plotting
 
-source('sample_types.R')
 
 #' Simulator of a phylogeny from an Age-Dependent Branching Process for a fixed number of sampled particles
 #' @param ntaxa number of sampled particles (at least 2)
@@ -43,6 +42,7 @@ simulate_phylogeny <- function(ntaxa, a, b, d = 0, rho = 1, origin_type = 0, Xsi
   tips = phylogeny@phylo$tip.label
   sampled_tips = sample(tips, ntaxa)
   phylogeny = drop.tip(phylogeny, setdiff(tips, sampled_tips))
+  phylogeny@phylo$tip.label = as.character(c(1:length(phylogeny@phylo$tip.label)))
   
   # remove status from data for exporting typed tree
   phylogeny@data = phylogeny@data %>% select(-status)
@@ -162,6 +162,7 @@ simulate_complete_tree <- function(ntaxa, origin_type, a, b, d, Xsi_as, Xsi_s) {
 }
 
   
+# Helper function for simulators of ADBP for sampling types of offspring upon division
 sample_types <- function(parent_type, Xsi_as, Xsi_s) {
   ntypes = ncol(Xsi_s)
   
