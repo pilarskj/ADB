@@ -7,6 +7,9 @@ import beast.base.inference.parameter.RealParameter;
 import feast.fileio.TreeFromNewickFile;
 import org.junit.jupiter.api.Test;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.DecimalFormat;
 
@@ -44,6 +47,89 @@ public class GammaBranchingModelTest {
         double logL = model.calculateTreeLogLikelihood(tree);
         System.out.println(logL);
         assertEquals(-328.7123, logL, 0.01);
+    }
+
+
+    @Test
+    public void testGammaBranchingInference() throws Exception {
+
+        // initialize
+        GammaBranchingModel model = new GammaBranchingModel();
+
+        // get tree
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/identifiability/trees_shape_100/tree_1.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        model.setInputValue("tree", tree);
+        model.setInputValue("approx", "false");
+
+        // set parameters
+        model.setInputValue("scale", new RealParameter("0.05"));
+        model.setInputValue("shape", new IntegerParameter("40"));
+        model.setInputValue("deathprob", new RealParameter("0.2"));
+        model.setInputValue("rho", new RealParameter("0.1"));
+        model.setInputValue("origin", new RealParameter("28.7557788647617"));
+
+        model.initAndValidate();
+
+        // calculate tree LL
+        double logL = model.calculateTreeLogLikelihood(tree);
+        System.out.println(logL);
+    }
+
+
+    @Test
+    public void testGammaBranchingGrid() throws Exception {
+
+        // initialize
+        GammaBranchingModel model = new GammaBranchingModel();
+
+        // get tree
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/identifiability/trees/tree_1.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        model.setInputValue("tree", tree);
+        model.setInputValue("approx", "false");
+        model.setInputValue("origin", new RealParameter("27.1906287767395"));
+        model.setInputValue("rho", new RealParameter("0.1")); // set to true value
+
+        BufferedReader br = new BufferedReader(new FileReader("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/identifiability/param_grid.csv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/identifiability/param_grid_out.csv"));
+
+        String line;
+        boolean isHeader = true;
+
+        // read each line from the csv
+        while ((line = br.readLine()) != null) {
+            System.out.println(line);
+            // split the line by comma
+            String[] values = line.split(",");
+
+            // if it's the first line (header), add a new column name
+            if (isHeader) {
+                isHeader = false;
+                bw.write(line + ",logL");  // Add a header for the new column
+                bw.newLine();
+                continue;
+            }
+
+            // read values from columns a, b, and d (assuming they are in known positions)
+            // set parameters
+            model.setInputValue("scale", new RealParameter(values[0]));
+            model.setInputValue("shape", new IntegerParameter(values[1]));
+            model.setInputValue("deathprob", new RealParameter(values[2]));
+            model.initAndValidate();
+
+            // calculate tree LL
+            double logL = model.calculateTreeLogLikelihood(tree);
+            bw.write(line + "," + logL);
+            bw.newLine();
+        }
+        bw.close();
     }
 
 

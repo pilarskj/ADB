@@ -37,10 +37,12 @@ public class GammaLogLikelihood {
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
 
+        /*
         // use much simpler calculation for BDS case
         if (b == 1 && d != 0.5) {
             return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
         }
+        */
 
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b, a);
@@ -88,8 +90,8 @@ public class GammaLogLikelihood {
             logB += Math.log(B[i]);
         }
 
-        // sum
-        return logP1 + logB;
+        // sum (with conditioning on survival)
+        return -Math.log(1 - P0[m-1]) + logP1 + logB;
     }
 
 
