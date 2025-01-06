@@ -16,8 +16,8 @@ import java.util.Arrays;
 public class GammaBranchingModel extends SpeciesTreeDistribution {
 
     // parametrization
-    final public Input<RealParameter> scaleParameterInput =
-            new Input<>("scale", "scale parameter of the Gamma distribution", Input.Validate.REQUIRED);
+    final public Input<RealParameter> lifetimeParameterInput =
+            new Input<>("lifetime", "expected lifetime", Input.Validate.REQUIRED);
     final public Input<IntegerParameter> shapeParameterInput =
             new Input<>("shape", "shape parameter of the Gamma distribution", Input.Validate.REQUIRED);
     final public Input<RealParameter> deathParameterInput =
@@ -73,7 +73,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     public double calculateTreeLogLikelihood(final TreeInterface tree) {
 
         // parameters
-        double a = scaleParameterInput.get().getValue();
+        double c = lifetimeParameterInput.get().getValue();
         int b = shapeParameterInput.get().getValue();
         double d = deathParameterInput.get().getValue();
         double rho = rhoParameterInput.get().getValue();
@@ -87,12 +87,12 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         int mB = stepSizeBInput.get();
         boolean approx = approxInput.get();
 
-        return calculateTreeLogLikelihood(tree, a, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
+        return calculateTreeLogLikelihood(tree, c, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
     }
 
 
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
-                                                final double a, final int b, final double d, final double rho, final double origin,
+                                                final double c, final int b, final double d, final double rho, final double origin,
                                                 final int maxIt, final double tolP, final double tolB, final int mP, final int mB, final boolean approx) {
 
         // stop if tree origin is smaller than root height
@@ -147,6 +147,9 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             treeFactor = treeFactor - Math.log(i);
         }
 
+        // get scale parameter of the Gamma distribution
+        double a = c / b;
+
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
                 intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx);
@@ -158,7 +161,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     @Override
     protected boolean requiresRecalculation() {
         return super.requiresRecalculation()
-                || scaleParameterInput.get().somethingIsDirty()
+                || lifetimeParameterInput.get().somethingIsDirty()
                 || shapeParameterInput.get().somethingIsDirty()
                 || deathParameterInput.get().somethingIsDirty()
                 || rhoParameterInput.get().somethingIsDirty()

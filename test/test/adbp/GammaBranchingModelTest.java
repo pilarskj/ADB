@@ -35,7 +35,7 @@ public class GammaBranchingModelTest {
         model.setInputValue("tree", tree);
 
         // set parameters
-        model.setInputValue("scale", new RealParameter("3"));
+        model.setInputValue("lifetime", new RealParameter("3"));
         model.setInputValue("shape", new IntegerParameter("1"));
         model.setInputValue("deathprob", new RealParameter("0"));
         model.setInputValue("rho", new RealParameter("0.9"));
