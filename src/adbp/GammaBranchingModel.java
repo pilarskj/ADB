@@ -135,11 +135,23 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             }
         }
 
+        // check node numbers
+        int nTips = tree.getLeafNodeCount();
+        assert extE.length == nTips;
+        assert intS.length == tree.getInternalNodeCount();
+        assert intE.length == tree.getInternalNodeCount();
+
+        // calculate tree factor
+        double treeFactor = (nTips-1) * Math.log(2);
+        for(int i = 1; i <= nTips; i++) {
+            treeFactor = treeFactor - Math.log(i);
+        }
+
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
                 intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx);
 
-        return logL;
+        return treeFactor + logL;
     }
 
 

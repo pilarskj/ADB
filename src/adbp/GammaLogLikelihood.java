@@ -37,13 +37,6 @@ public class GammaLogLikelihood {
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
 
-        /*
-        // use much simpler calculation for BDS case
-        if (b == 1 && d != 0.5) {
-            return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
-        }
-        */
-
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b, a);
 
@@ -91,7 +84,7 @@ public class GammaLogLikelihood {
         }
 
         // sum (with conditioning on survival)
-        return -Math.log(1 - P0[m-1]) + logP1 + logB;
+        return -Math.log(1 - P0[m - 1]) + logP1 + logB;
     }
 
 
@@ -306,7 +299,7 @@ public class GammaLogLikelihood {
 
         // use cashing to avoid creating a new GammaDistribution object with shape i*b for i=1,2,... in each iteration
         // create a map to store the distributions for each i (once needed) and re-use them
-        // use a thread-safe and dynamic Map
+        // use a thread-safe and dynamic map
         ConcurrentHashMap<Integer, GammaDistribution> gammaCache = new ConcurrentHashMap<>();
 
         // get number of branches
@@ -337,28 +330,28 @@ public class GammaLogLikelihood {
                     while (term > tol) {
                         GammaDistribution gammaDist;
                         // check if GammaDistribution with the given shape is already in the cache
-                        if (gammaCache.containsKey(i+1)) {
-                            gammaDist = gammaCache.get(i+1);
+                        if (gammaCache.containsKey(i + 1)) {
+                            gammaDist = gammaCache.get(i + 1);
                         } else { // otherwise, add it
-                            gammaDist = new GammaDistribution((i+1) * b, a);
-                            gammaCache.put(i+1, gammaDist);
+                            gammaDist = new GammaDistribution((i + 1) * b, a);
+                            gammaCache.put(i + 1, gammaDist);
                         }
-                        term = Math.pow(2, i) * Math.pow(1-d, i+1) * Math.pow(P0M, i) * gammaDist.density(ex - sx); // calculate b_i
+                        term = Math.pow(2, i) * Math.pow(1 - d, i + 1) * Math.pow(P0M, i) * gammaDist.density(ex - sx); // calculate b_i
                         branchProb += term;
                         i++;
                     }
-                    int j = k-1; // decrease k
+                    int j = k - 1; // decrease k
                     term = 1;
                     while (term > tol & j >= 0) {
                         GammaDistribution gammaDist;
                         // check if GammaDistribution with the given shape is already in the cache
-                        if (gammaCache.containsKey(j+1)) {
-                            gammaDist = gammaCache.get(j+1);
+                        if (gammaCache.containsKey(j + 1)) {
+                            gammaDist = gammaCache.get(j + 1);
                         } else { // otherwise, add it
-                            gammaDist = new GammaDistribution((j+1) * b, a);
-                            gammaCache.put(j+1, gammaDist);
+                            gammaDist = new GammaDistribution((j + 1) * b, a);
+                            gammaCache.put(j + 1, gammaDist);
                         }
-                        term = Math.pow(2, j) * Math.pow(1-d, j+1) * Math.pow(P0M, j) * gammaDist.density(ex - sx); // calculate b_j
+                        term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * gammaDist.density(ex - sx); // calculate b_j
                         branchProb += term;
                         j--;
                     }
@@ -409,8 +402,12 @@ public class GammaLogLikelihood {
     // complexity log(n) instead of n in a loop
     public static int findClosestIndex(double[] array, double value) {
         // if value is at boundaries
-        if (value <= array[0]) { return 0; }
-        if (value >= array[array.length - 1]) { return array.length - 1; }
+        if (value <= array[0]) {
+            return 0;
+        }
+        if (value >= array[array.length - 1]) {
+            return array.length - 1;
+        }
 
         // do binary search
         int index = Arrays.binarySearch(array, value);
@@ -438,47 +435,4 @@ public class GammaLogLikelihood {
         }
         return sum / array.length;
     }
-
-
-    // Simpler function for calculating the log likelihood of a birth-death-sampling tree (Stadler, JTB 2010)
-    public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
-                                             double[] intS, double[] extE) {
-
-        // get birth and death rate
-        double lambda = (1-d) / a;
-        double mu = d / a;
-
-        // get all bifurcation times
-        double[] t = new double[intS.length + 1];
-        System.arraycopy(intS, 0, t, 0, intS.length);
-        t[t.length - 1] = origin;
-
-        // get branch probabilities (no sampling through time)
-        double c1 = lambda - mu;
-        double c2 = - (lambda-mu - 2*lambda*rho) / c1;
-        double[] B = new double[t.length];
-        IntStream.range(0, t.length)
-                .parallel()
-                .forEach(i -> {
-                    B[i] = 2 * (1 - Math.pow(c2, 2)) +
-                            Math.exp(-c1*t[i]) * Math.pow(1-c2, 2) +
-                            Math.exp(c1*t[i]) * Math.pow(1+c2, 2);
-                });
-
-        // make log and sum
-        double logB = 0;
-        for (int i = 0; i < B.length; i++) {
-            logB += Math.log(B[i]);
-        }
-
-        // get log likelihood
-        int n = extE.length; // number of tips
-        double logL = (n-1) * Math.log(lambda) + n * Math.log(4*rho) - logB;
-
-        return logL;
-    }
 }
-
-
-
-
