@@ -7,14 +7,14 @@ library(ggtree) # for plotting
 
 #' Simulator of a phylogeny from an Age-Dependent Branching Process for a fixed time interval (since origin)
 #' @param origin_time time of birth of the initial particle
-#' @param origin_type one of 0,...,n-1 where n is the number of types
 #' @param a vector of scale parameters per type
 #' @param b vector of shape parameters per type
 #' @param d vector of death probabilities per type
+#' @param rho sampling probability 
+#' @param origin_type one of 0,...,n-1 where n is the number of types
 #' @param Xsi_as matrix of asymetric type transition probabilities
 #' @param Xsi_s matrix of symetric type transition probabilities
-#' @param rho sampling probability 
-#' @param rho minimum number of tips in the phylogeny
+#' @param min_tips minimum number of tips in the phylogeny
 simulate_phylogeny <- function(origin_time, a, b, d = 0, rho = 1, origin_type = 0, Xsi_as = matrix(0), Xsi_s = matrix(1), min_tips = 2) {
   # assert that all inputs are correct
   ntypes = length(a)
@@ -27,7 +27,7 @@ simulate_phylogeny <- function(origin_time, a, b, d = 0, rho = 1, origin_type = 
               msg = 'The transition probabilities do not some to 1. Please check!')
   
   # simulate full tree
-  tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips)
+  tree = simulate_complete_tree(origin_time, a, b, d, origin_type, Xsi_as, Xsi_s, min_tips)
   if (is.null(tree)) {
     return(NULL)
   }
@@ -61,7 +61,7 @@ simulate_phylogeny <- function(origin_time, a, b, d = 0, rho = 1, origin_type = 
 
 
 # Simulator of the complete Age-Dependent Branching Process for a fixed time interval (since origin)
-simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, min_tips = 2) {
+simulate_complete_tree <- function(origin_time, a, b, d, origin_type, Xsi_as, Xsi_s, min_tips = 2) {
   
   # initialize
   edges = matrix(nrow = 0, ncol = 2)
@@ -98,30 +98,37 @@ simulate_complete_tree <- function(origin_time, origin_type, a, b, d, Xsi_as, Xs
       event_counter = event_counter + 2
       nodes[event$id, "status"] = 2
 
-      # sample types
-      children_types = sample_types(event$type, Xsi_as, Xsi_s)
+      if (ncol(Xsi_s) == 1) { 
+        # single-type case
+        children_types = rep(origin_type, 2)
+      } else {
+        # multi-type case: sample types
+        children_types = sample_types(event$type, Xsi_as, Xsi_s)
+      }
 
       # sample lifetimes and add new nodes
-      left_lifetime = rgamma(1, shape = b[event$type + 1], scale = a[event$type + 1])
+      left_type = children_types[1]
+      left_lifetime = rgamma(1, shape = b[left_type + 1], scale = a[left_type + 1])
       if (event$height - left_lifetime < 0) {
         # censor lifetime
         left_lifetime = event$height
-        left_node = c(id = left_id, height = event$height - left_lifetime, type = children_types[1], 
+        left_node = c(id = left_id, height = event$height - left_lifetime, type = left_type, 
                       parent = event$id, leftchild = NA, rightchild = NA, status = 1)
       } else {
-        left_node = c(id = left_id, height = event$height - left_lifetime, type = children_types[1], 
+        left_node = c(id = left_id, height = event$height - left_lifetime, type = left_type, 
                       parent = event$id, leftchild = NA, rightchild = NA, status = 1)
         events = bind_rows(events, left_node) # to be processed
       }
 
-      right_lifetime = rgamma(1, shape = b[event$type + 1], scale = a[event$type + 1])
+      right_type = children_types[2]
+      right_lifetime = rgamma(1, shape = b[right_type + 1], scale = a[right_type + 1])
       if (event$height - right_lifetime < 0) {
         # censor lifetime, make tip
         right_lifetime = event$height
-        right_node = c(id = right_id, height = event$height - right_lifetime, type = children_types[2], 
+        right_node = c(id = right_id, height = event$height - right_lifetime, type = right_type, 
                       parent = event$id, leftchild = NA, rightchild = NA, status = 1)
       } else {
-        right_node = c(id = right_id, height = event$height - right_lifetime, type = children_types[2], 
+        right_node = c(id = right_id, height = event$height - right_lifetime, type = right_type, 
                        parent = event$id, leftchild = NA, rightchild = NA, status = 1)
         events = bind_rows(events, right_node) # to be processed
       }
@@ -195,20 +202,19 @@ sample_types <- function(parent_type, Xsi_as, Xsi_s) {
 
 
 # # Example
-# origin_time = 10
-# origin_type = 0
-# a = c(2, 3)
+# origin_time = 5
+# a = c(2, 0.5)
 # b = c(1, 2)
 # d = c(0.2, 0.1)
+# rho = 0.8
+# origin_type = 0
 # Xsi_as = rbind(c(0, 0.1), c(0.2, 0))
 # Xsi_s = rbind(c(0.5, 0.3), c(0.1, 0.5))
-# rho = 0.8
 # set.seed(1)
 
-# tree = simulate_complete_tree(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s)
-# ggtree(tree) + geom_point(aes(color = type)) + geom_rootedge() + geom_tiplab() + theme_tree2()
+# tree = simulate_complete_tree(origin_time, a, b, d, origin_type, Xsi_as, Xsi_s)
 # ggtree(tree) + geom_rootedge() + geom_point(aes(x = x - branch.length, color = type), size = 2)
-# phylogeny = simulate_phylogeny(origin_time, origin_type, a, b, d, Xsi_as, Xsi_s, rho)
+# phylogeny = simulate_phylogeny(origin_time, a, b, d, rho, origin_type, Xsi_as, Xsi_s)
 # ggtree(phylogeny) + geom_point(aes(color = type))
 # write.beast.newick(phylogeny)
 
