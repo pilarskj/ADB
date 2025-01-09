@@ -37,6 +37,13 @@ public class GammaLogLikelihood {
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
 
+        /*
+        // use much simpler calculation for BDS case
+        if (b == 1 && d != 0.5) {
+            return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
+        }
+        */
+
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b, a);
 
@@ -44,9 +51,9 @@ public class GammaLogLikelihood {
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
 
         double[] tSeq = new double[m];
-        final double dx = origin / m;
+        final double dx = origin / (m - 1); // m
         for (int i = 0; i < m; i++) {
-            tSeq[i] = dx * (i + 1);
+            tSeq[i] = dx * i; // (i + 1)
         }
         assert tSeq[m - 1] == origin;
 
@@ -227,9 +234,9 @@ public class GammaLogLikelihood {
                     // generate linearly spaced values between start and end
                     double[] tSeq = new double[m];
                     double[] age_seq = new double[m];
-                    double dx = (ex - sx) / m;
+                    double dx = (ex - sx) / (m - 1); // m
                     for (int i = 0; i < m; i++) {
-                        tSeq[i] = sx + dx * (i + 1);
+                        tSeq[i] = sx + dx * i; // (i + 1)
                         age_seq[i] = tSeq[i] - sx;
                     }
                     assert age_seq[m - 1] == ex - sx;
@@ -434,5 +441,48 @@ public class GammaLogLikelihood {
             sum += num;
         }
         return sum / array.length;
+    }
+
+
+    // simpler function for calculating the log likelihood of a birth-death-sampling tree (Stadler, JTB 2010) - for testing
+    public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
+                                             double[] intS, double[] extE) {
+
+        // get birth and death rate
+        double lambda = (1 - d) / a;
+        double mu = d / a;
+
+        // get all bifurcation times
+        double[] t = new double[intS.length + 1];
+        System.arraycopy(intS, 0, t, 0, intS.length);
+        t[t.length - 1] = origin;
+        // double[] t = intS; // or only internal nodes
+
+        // get branch probabilities (no sampling through time)
+        double c1 = lambda - mu;
+        double c2 = -(lambda - mu - 2 * lambda * rho) / c1;
+        double[] B = new double[t.length];
+        IntStream.range(0, t.length)
+                .parallel()
+                .forEach(i -> {
+                    B[i] = 2 * (1 - Math.pow(c2, 2)) +
+                            Math.exp(-c1 * t[i]) * Math.pow(1 - c2, 2) +
+                            Math.exp(c1 * t[i]) * Math.pow(1 + c2, 2);
+                });
+
+        // make log and sum
+        double logB = 0;
+        for (int i = 0; i < B.length; i++) {
+            logB += Math.log(B[i]);
+        }
+
+        // condition on survival
+        double p0 = 1 - (rho * (lambda - mu)) / (rho * lambda + (lambda * (1 - rho) - mu) * Math.exp(-(lambda - mu) * origin));
+
+        // get log likelihood
+        int n = extE.length; // number of tips
+        double logL = -Math.log(1 - p0) + (n - 1) * Math.log(lambda) + n * Math.log(4 * rho) - logB;
+
+        return logL;
     }
 }

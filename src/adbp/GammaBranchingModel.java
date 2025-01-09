@@ -10,6 +10,8 @@ import beast.base.inference.parameter.RealParameter;
 
 import java.util.Arrays;
 
+import static org.apache.commons.math3.special.Gamma.logGamma;
+
 @Description("This model implements an Age-Dependent Branching Process " +
         "with lifetimes distributed according to a Gamma distribution with integer shape parameter (Erlang distribution), " +
         "a death probability and extant sampling.")
@@ -142,10 +144,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         assert intE.length == tree.getInternalNodeCount();
 
         // calculate tree factor
-        double treeFactor = (nTips-1) * Math.log(2);
-        for(int i = 1; i <= nTips; i++) {
-            treeFactor = treeFactor - Math.log(i);
-        }
+        double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
 
         // get scale parameter of the Gamma distribution
         double a = c / b;
