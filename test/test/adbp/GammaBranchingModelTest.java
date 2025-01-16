@@ -59,7 +59,7 @@ public class GammaBranchingModelTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/identifiability/trees_shape_100/tree_1.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test2/b1/trees/tree_1.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -67,11 +67,11 @@ public class GammaBranchingModelTest {
         model.setInputValue("approx", "false");
 
         // set parameters
-        model.setInputValue("scale", new RealParameter("0.05"));
-        model.setInputValue("shape", new IntegerParameter("40"));
-        model.setInputValue("deathprob", new RealParameter("0.2"));
+        model.setInputValue("lifetime", new RealParameter("5"));
+        model.setInputValue("shape", new IntegerParameter("1"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("28.7557788647617"));
+        model.setInputValue("origin", new RealParameter("42.8106111505566"));
 
         model.initAndValidate();
 
@@ -142,31 +142,31 @@ public class GammaBranchingModelTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/bds/tree_10_tips.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test1/trees/tree_1.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
         model.setInputValue("tree", tree);
 
         // set parameters
-        model.setInputValue("shape", new IntegerParameter("1"));
-        model.setInputValue("scale", new RealParameter("2"));
-        model.setInputValue("deathprob", new RealParameter("0.2"));
+        // model.setInputValue("shape", new IntegerParameter("1"));
+        model.setInputValue("lifetime", new RealParameter("5"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("17.47451")); //17.47451 32.10385 33.59449
+        model.setInputValue("origin", new RealParameter("60.5037032882197")); //17.47451 32.10385 33.59449
         model.setInputValue("approx", true);
 
         // loop over different parameter values
         double start = 1;
-        double end = 10;
+        double end = 50;
         double step = 1;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/bds/adbp_approx_loglik.csv", true);
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test1/tree_1_loglik_before.csv", true);
         DecimalFormat df = new DecimalFormat("0.0");
         for (double i = start; i <= end; i += step) {
-            model.setInputValue("scale", new RealParameter(Double.toString(i)));
+            model.setInputValue("shape", new IntegerParameter(Double.toString(i)));
             model.initAndValidate();
             double logL = model.calculateTreeLogLikelihood(tree);
             // add n, param, value, loglik
-            writer.write(tree.getLeafNodeCount() + ",a," + i + "," + logL + "\n"); //df.format(i)
+            writer.write(i + "," + logL + "\n"); //df.format(i)
         }
         writer.close();
     }

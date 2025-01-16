@@ -1,7 +1,9 @@
+
 package test.adbp;
 
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
+import bdsky.evolution.speciation.BirthDeathSkylineModel;
 import beast.base.evolution.speciation.BirthDeathGernhard08Model;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.parameter.RealParameter;
@@ -35,6 +37,37 @@ public class BDTest {
         // calculate tree LL
         double logL = model.calculateTreeLogLikelihood(tree);
         System.out.println(logL); // value does not match with ADBP (maybe another conditioning?)
+    }
+
+    @Test
+    public void testBDSKY() throws Exception {
+        // initialize
+        BirthDeathSkylineModel model = new BirthDeathSkylineModel();
+
+        // get tree with 150 tips
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "examples/tree.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        model.setInputValue("tree", tree);
+
+        // set parameters
+        model.setInputValue("birthRate", new RealParameter("0.4"));
+        model.setInputValue("deathRate", new RealParameter("0.1"));
+        model.setInputValue("samplingRate", new RealParameter("0"));
+        model.setInputValue("rho", new RealParameter("0.9"));
+        model.setInputValue("origin", new RealParameter("15"));
+        //model.setInputValue("rhoSamplingTimes", new RealParameter("0"));
+        //model.setInputValue("contemp", "true");
+        //model.setInputValue("conditionOnSurvival", "true");
+        //model.setInputValue("conditionOnRhoSampling", "true");
+
+        model.initAndValidate();
+
+        // calculate tree LL
+        double logL = model.calculateTreeLogLikelihood(tree);
+        System.out.println(logL); // value matches with ADBP without tree factor (has been discarded)
     }
 
 
@@ -73,7 +106,7 @@ public class BDTest {
         BirthDeathMigrationDistribution density = new BirthDeathMigrationDistribution();
         density.initByName(
                 "parameterization", parameterization,
-                "frequencies", new RealParameter("1"), //startTypePriorProbs - how to use module instead of local installation?
+                "startTypePriorProbs", new RealParameter("1"),
                 "tree", tree,
                 "typeLabel", "type",
                 "parallelize", false,
@@ -83,3 +116,4 @@ public class BDTest {
         System.out.println(logL); // value matches with ADBP
     }
 }
+

@@ -51,9 +51,9 @@ public class GammaLogLikelihood {
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
 
         double[] tSeq = new double[m];
-        final double dx = origin / (m - 1); // m
+        final double dx = origin / m; // (m - 1)
         for (int i = 0; i < m; i++) {
-            tSeq[i] = dx * i; // (i + 1)
+            tSeq[i] = dx * (i + 1); // i
         }
         assert tSeq[m - 1] == origin;
 
@@ -61,7 +61,7 @@ public class GammaLogLikelihood {
         double[] pdf = new double[m];
         double[] cdf = new double[m];
         for (int i = 0; i < m; i++) {
-            pdf[i] = gammaDist.density(tSeq[i]);
+            pdf[i] = Math.exp(gammaDist.logDensity(tSeq[i])); // gammaDist.density(tSeq[i]) - use log to prevent underflow
             cdf[i] = gammaDist.cumulativeProbability(tSeq[i]);
         }
         Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
@@ -234,9 +234,9 @@ public class GammaLogLikelihood {
                     // generate linearly spaced values between start and end
                     double[] tSeq = new double[m];
                     double[] age_seq = new double[m];
-                    double dx = (ex - sx) / (m - 1); // m
+                    double dx = (ex - sx) / m; // (m - 1)
                     for (int i = 0; i < m; i++) {
-                        tSeq[i] = sx + dx * i; // (i + 1)
+                        tSeq[i] = sx + dx * (i + 1); // i
                         age_seq[i] = tSeq[i] - sx;
                     }
                     assert age_seq[m - 1] == ex - sx;
@@ -245,7 +245,7 @@ public class GammaLogLikelihood {
                     double[] pdf = new double[m];
                     double[] P = new double[m];
                     for (int i = 0; i < m; i++) {
-                        pdf[i] = gammaDist.density(age_seq[i]);
+                        pdf[i] = Math.exp(gammaDist.logDensity(age_seq[i])); // gammaDist.density(age_seq[i])
                         P[i] = function.value(tSeq[i]);
                     }
                     Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD); // perform FFT
@@ -343,7 +343,7 @@ public class GammaLogLikelihood {
                             gammaDist = new GammaDistribution((i + 1) * b, a);
                             gammaCache.put(i + 1, gammaDist);
                         }
-                        term = Math.pow(2, i) * Math.pow(1 - d, i + 1) * Math.pow(P0M, i) * gammaDist.density(ex - sx); // calculate b_i
+                        term = Math.pow(2, i) * Math.pow(1 - d, i + 1) * Math.pow(P0M, i) * Math.exp(gammaDist.logDensity(ex - sx)); // calculate b_i
                         branchProb += term;
                         i++;
                     }
@@ -358,7 +358,7 @@ public class GammaLogLikelihood {
                             gammaDist = new GammaDistribution((j + 1) * b, a);
                             gammaCache.put(j + 1, gammaDist);
                         }
-                        term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * gammaDist.density(ex - sx); // calculate b_j
+                        term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * Math.exp(gammaDist.logDensity(ex - sx)); // calculate b_j
                         branchProb += term;
                         j--;
                     }
