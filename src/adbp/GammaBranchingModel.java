@@ -5,6 +5,7 @@ import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
+import beast.base.inference.StateNode;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 
@@ -177,13 +178,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
     @Override
     protected boolean requiresRecalculation() {
-        return super.requiresRecalculation()
-                || lifetimeParameterInput.get().somethingIsDirty()
-                || shapeIntegerParameterInput.get().somethingIsDirty()
-                || shapeRealParameterInput.get().somethingIsDirty()
-                || deathParameterInput.get().somethingIsDirty()
-                || rhoParameterInput.get().somethingIsDirty()
-                || originParameterInput.get().somethingIsDirty();
+        return true;
     }
 
 
