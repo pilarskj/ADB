@@ -33,7 +33,7 @@ public class GammaLogLikelihood {
     maxIt: maximum number of iterations, tolP: error tolerance for P0 and P1, tolB: error tolerance for branch probabilities (B),
     mP: step size for P0 and P1, mB: step size for B, approx: approximate B?
      */
-    public static double calcLogLikelihood(double a, int b, double d, double rho, double origin,
+    public static double calcLogLikelihood(double a, Number b, double d, double rho, double origin,
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
 
@@ -45,7 +45,7 @@ public class GammaLogLikelihood {
         */
 
         // initialize distribution
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
+        GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
 
         // generate linearly spaced values between 0 and origin
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
@@ -75,7 +75,7 @@ public class GammaLogLikelihood {
         // calculate probabilities of internal branches
         double[] B;
         if (approx) {
-            B = approxB(a, b, d, intS, intE, tSeq, P0, tolB);
+            B = approxB(a, b.intValue(), d, intS, intE, tSeq, P0, tolB);
         } else {
             B = calcB(a, b, d, intS, intE, tSeq, P0, maxIt, tolB, mB);
         }
@@ -208,12 +208,12 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating branch probabilities
-    public static double[] calcB(double a, int b, double d,
+    public static double[] calcB(double a, Number b, double d,
                                  double[] s, double[] e, double[] t0, double[] P0,
                                  int maxIt, double tol, int m) {
 
         // initialize distribution
-        GammaDistribution gammaDist = new GammaDistribution(b, a);
+        GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
 
         // interpolate P0
         UnivariateFunction function = interpolator.interpolate(t0, P0);

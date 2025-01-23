@@ -36,11 +36,12 @@ public class GammaBranchingModelTest {
 
         // set parameters
         model.setInputValue("lifetime", new RealParameter("2")); //3
-        model.setInputValue("shape", new IntegerParameter("1"));
+        model.setInputValue("shapeInteger", new IntegerParameter("1"));
+        //model.setInputValue("shapeReal", new RealParameter("1"));
         model.setInputValue("deathprob", new RealParameter("0.2")); //0
         model.setInputValue("rho", new RealParameter("0.9"));
         model.setInputValue("origin", new RealParameter("15")); //12
-        model.setInputValue("approx", "false");
+        model.setInputValue("approx", "true");
 
         model.initAndValidate();
 
@@ -64,11 +65,11 @@ public class GammaBranchingModelTest {
                 "adjustTipHeights", true);
 
         model.setInputValue("tree", tree);
-        model.setInputValue("approx", "false");
+        model.setInputValue("approx", "true");
 
         // set parameters
         model.setInputValue("lifetime", new RealParameter("5"));
-        model.setInputValue("shape", new IntegerParameter("1"));
+        model.setInputValue("shapeInteger", new IntegerParameter("4"));
         model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
         model.setInputValue("origin", new RealParameter("42.8106111505566"));

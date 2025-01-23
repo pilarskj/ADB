@@ -20,8 +20,10 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     // parametrization
     final public Input<RealParameter> lifetimeParameterInput =
             new Input<>("lifetime", "expected lifetime", Input.Validate.REQUIRED);
-    final public Input<IntegerParameter> shapeParameterInput =
-            new Input<>("shape", "shape parameter of the Gamma distribution", Input.Validate.REQUIRED);
+    final public Input<IntegerParameter> shapeIntegerParameterInput =
+            new Input<>("shapeInteger", "integer shape parameter of the Gamma distribution");
+    final public Input<RealParameter> shapeRealParameterInput =
+            new Input<>("shapeReal", "real shape parameter of the Gamma distribution");
     final public Input<RealParameter> deathParameterInput =
             new Input<>("deathprob", "probability of death at branching times (default 0)", new RealParameter("0.0"));
     final public Input<RealParameter> rhoParameterInput =
@@ -54,6 +56,17 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             Log.warning.println("WARNING: This model (tree prior) cannot handle dated tips.");
         }
 
+        // check type of shape
+        if (shapeIntegerParameterInput.get() == null && shapeRealParameterInput.get() == null) {
+            throw new IllegalArgumentException("Please specify a shape parameter");
+        } else if (shapeIntegerParameterInput.get() != null && shapeRealParameterInput.get() != null) {
+            throw new IllegalArgumentException("Please specify either an integer or real shape parameter, not both");
+        } else if (shapeRealParameterInput.get() != null) {
+            if (approxInput.get()) {
+                throw new IllegalArgumentException("The approximation only works for an integer shape parameter!");
+            }
+        }
+
         // check that step sizes are power of 2 (required for FFT)
         if (!isPowerOfTwo(stepSizePInput.get())) {
             throw new IllegalArgumentException("stepSizeP must be a power of 2");
@@ -75,8 +88,13 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     public double calculateTreeLogLikelihood(final TreeInterface tree) {
 
         // parameters
-        double c = lifetimeParameterInput.get().getValue();
-        int b = shapeParameterInput.get().getValue();
+        double C = lifetimeParameterInput.get().getValue();
+        Number b = null;
+        if (shapeIntegerParameterInput.get() != null) {
+            b = shapeIntegerParameterInput.get().getValue();
+        } else if (shapeRealParameterInput.get() != null) {
+            b = shapeRealParameterInput.get().getValue();
+        }
         double d = deathParameterInput.get().getValue();
         double rho = rhoParameterInput.get().getValue();
         double origin = originParameterInput.get().getValue();
@@ -89,12 +107,12 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         int mB = stepSizeBInput.get();
         boolean approx = approxInput.get();
 
-        return calculateTreeLogLikelihood(tree, c, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
+        return calculateTreeLogLikelihood(tree, C, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
     }
 
 
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
-                                                final double c, final int b, final double d, final double rho, final double origin,
+                                                final double C, final Number b, final double d, final double rho, final double origin,
                                                 final int maxIt, final double tolP, final double tolB, final int mP, final int mB, final boolean approx) {
 
         // stop if tree origin is smaller than root height
@@ -147,7 +165,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
 
         // get scale parameter of the Gamma distribution
-        double a = c / b;
+        double a = C / b.doubleValue();
 
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
@@ -161,7 +179,8 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     protected boolean requiresRecalculation() {
         return super.requiresRecalculation()
                 || lifetimeParameterInput.get().somethingIsDirty()
-                || shapeParameterInput.get().somethingIsDirty()
+                || shapeIntegerParameterInput.get().somethingIsDirty()
+                || shapeRealParameterInput.get().somethingIsDirty()
                 || deathParameterInput.get().somethingIsDirty()
                 || rhoParameterInput.get().somethingIsDirty()
                 || originParameterInput.get().somethingIsDirty();
