@@ -51,9 +51,9 @@ public class GammaLogLikelihood {
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
 
         double[] tSeq = new double[m];
-        final double dx = origin / m; // (m - 1)
+        final double dx = origin / m;
         for (int i = 0; i < m; i++) {
-            tSeq[i] = dx * (i + 1); // i
+            tSeq[i] = dx * (i + 1);
         }
         assert tSeq[m - 1] == origin;
 
@@ -62,23 +62,34 @@ public class GammaLogLikelihood {
         double[] cdf = new double[m];
         for (int i = 0; i < m; i++) {
             pdf[i] = Math.exp(gammaDist.logDensity(tSeq[i])); // gammaDist.density(tSeq[i]) - use log to prevent underflow
+            //pdf[i] = (tSeq[i] == 0 & b.doubleValue() == 1) ? 1 / a : Math.exp(gammaDist.logDensity(tSeq[i]));
             cdf[i] = gammaDist.cumulativeProbability(tSeq[i]);
         }
         Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
 
         // calculate extinction probability over time
         final double[] P0 = calcP0(pdfFFT, cdf, d, rho, dx, maxIt, tolP);
+        //System.out.println("P0 min " + Arrays.stream(P0).min() + " max " + Arrays.stream(P0).max());
 
         // calculate probability of single descendants at tips
         final double[] P1 = calcP1(pdfFFT, cdf, P0, d, rho, extE, tSeq, dx, maxIt, tolP);
+        //System.out.println("P1 min " + Arrays.stream(P0).min() + " max " + Arrays.stream(P1).max());
 
         // calculate probabilities of internal branches
         double[] B;
         if (approx) {
             B = approxB(a, b.intValue(), d, intS, intE, tSeq, P0, tolB);
         } else {
-            B = calcB(a, b, d, intS, intE, tSeq, P0, maxIt, tolB, mB);
+            // extend arrays (to calculate probabilities of very short internal branches)
+            double[] extSeq = new double[tSeq.length + 1];
+            double[] extP0 = new double[P0.length + 1];
+            extSeq[0] = 0;
+            extP0[0] = 1 - rho;
+            System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
+            System.arraycopy(P0, 0, extP0, 1, P0.length);
+            B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tolB, mB);
         }
+        //System.out.println("B min " + Arrays.stream(B).min() + " max " + Arrays.stream(B).max());
 
         // make log and sum
         double logP1 = 0;
@@ -120,6 +131,8 @@ public class GammaLogLikelihood {
             for (int i = 0; i < n; i++) {
                 y[i] = X[i] * X[i];
             }
+            //double miny = Arrays.stream(X).min().getAsDouble();
+            //double maxy = Arrays.stream(X).max().getAsDouble();
 
             // partially convolve
             double[] I = convolveFFT(pdfFFT, y, n, dx);
@@ -197,10 +210,18 @@ public class GammaLogLikelihood {
         }
 
         // interpolate
-        UnivariateFunction function = interpolator.interpolate(tSeq, X);
+        // extend arrays (to calculate probabilities of very short external branches)
+        double[] extSeq = new double[tSeq.length + 1];
+        double[] extX = new double[X.length + 1];
+        extSeq[0] = 0;
+        extX[0] = rho;
+        System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
+        System.arraycopy(X, 0, extX, 1, X.length);
+
+        UnivariateFunction function = interpolator.interpolate(extSeq, extX);
         double[] P1 = new double[extT.length];
         for (int i = 0; i < extT.length; i++) {
-            P1[i] = function.value(extT[i]);
+            P1[i] = function.value(extT[i]); // interpolate
         }
 
         return P1;
@@ -234,9 +255,9 @@ public class GammaLogLikelihood {
                     // generate linearly spaced values between start and end
                     double[] tSeq = new double[m];
                     double[] age_seq = new double[m];
-                    double dx = (ex - sx) / m; // (m - 1)
+                    double dx = (ex - sx) / m;
                     for (int i = 0; i < m; i++) {
-                        tSeq[i] = sx + dx * (i + 1); // i
+                        tSeq[i] = sx + dx * (i + 1);
                         age_seq[i] = tSeq[i] - sx;
                     }
                     assert age_seq[m - 1] == ex - sx;
@@ -245,9 +266,10 @@ public class GammaLogLikelihood {
                     double[] pdf = new double[m];
                     double[] P = new double[m];
                     for (int i = 0; i < m; i++) {
-                        pdf[i] = Math.exp(gammaDist.logDensity(age_seq[i])); // gammaDist.density(age_seq[i])
+                        pdf[i] = Math.exp(gammaDist.logDensity(age_seq[i]));
                         P[i] = function.value(tSeq[i]);
                     }
+                    double maxP = Arrays.stream(P).max().getAsDouble();
                     Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD); // perform FFT
 
                     // initialize
