@@ -38,11 +38,11 @@ public class GammaLogLikelihood {
                                            int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
 
         /*
-        // use much simpler calculation for BDS case
-        if (b == 1 && d != 0.5) {
+        // use much simpler calculation for BD case
+        if (b.doubleValue() == 1 && d != 0.5) {
             return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
-        }
-        */
+        } */
+
 
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
@@ -62,18 +62,23 @@ public class GammaLogLikelihood {
         double[] cdf = new double[m];
         for (int i = 0; i < m; i++) {
             pdf[i] = Math.exp(gammaDist.logDensity(tSeq[i])); // gammaDist.density(tSeq[i]) - use log to prevent underflow
-            //pdf[i] = (tSeq[i] == 0 & b.doubleValue() == 1) ? 1 / a : Math.exp(gammaDist.logDensity(tSeq[i]));
             cdf[i] = gammaDist.cumulativeProbability(tSeq[i]);
         }
         Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
 
         // calculate extinction probability over time
         final double[] P0 = calcP0(pdfFFT, cdf, d, rho, dx, maxIt, tolP);
-        //System.out.println("P0 min " + Arrays.stream(P0).min() + " max " + Arrays.stream(P0).max());
+        /* // print error if P0 is not in range
+        if (Arrays.stream(P0).min().getAsDouble() < 0 || Arrays.stream(P0).max().getAsDouble() > 1) {
+            Log.debug.println("P0 not in range [0,1]");
+        } */
 
         // calculate probability of single descendants at tips
         final double[] P1 = calcP1(pdfFFT, cdf, P0, d, rho, extE, tSeq, dx, maxIt, tolP);
-        //System.out.println("P1 min " + Arrays.stream(P0).min() + " max " + Arrays.stream(P1).max());
+        /* // print error if P1 is not in range
+        if (Arrays.stream(P1).min().getAsDouble() < 0 || Arrays.stream(P1).max().getAsDouble() > 1) {
+            Log.debug.println("P1 not in range [0,1]");
+        } */
 
         // calculate probabilities of internal branches
         double[] B;
@@ -89,7 +94,6 @@ public class GammaLogLikelihood {
             System.arraycopy(P0, 0, extP0, 1, P0.length);
             B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tolB, mB);
         }
-        //System.out.println("B min " + Arrays.stream(B).min() + " max " + Arrays.stream(B).max());
 
         // make log and sum
         double logP1 = 0;
@@ -131,8 +135,6 @@ public class GammaLogLikelihood {
             for (int i = 0; i < n; i++) {
                 y[i] = X[i] * X[i];
             }
-            //double miny = Arrays.stream(X).min().getAsDouble();
-            //double maxy = Arrays.stream(X).max().getAsDouble();
 
             // partially convolve
             double[] I = convolveFFT(pdfFFT, y, n, dx);
@@ -478,7 +480,6 @@ public class GammaLogLikelihood {
         double[] t = new double[intS.length + 1];
         System.arraycopy(intS, 0, t, 0, intS.length);
         t[t.length - 1] = origin;
-        // double[] t = intS; // or only internal nodes
 
         // get branch probabilities (no sampling through time)
         double c1 = lambda - mu;

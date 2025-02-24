@@ -2,7 +2,7 @@ library(ape)
 library(treeio)
 library(dplyr)
 library(assertthat)
-library(ggtree) # for plotting
+# library(ggtree) # for plotting
 
 
 #' Simulator of a phylogeny from an Age-Dependent Branching Process for a fixed number of sampled particles
@@ -78,6 +78,9 @@ simulate_complete_tree <- function(ntaxa, a, b, d, origin_type, Xsi_as, Xsi_s) {
   living = 1
   
   while (living < ntaxa & nrow(events) > 0) {
+    if (living %% 10000 == 0) {
+      print(paste0(living, ' cells alive'))
+    }
     event = as.list(events[1, ]); events = events[-1, ] # look at one event
     
     if (runif(1) < d[event$type + 1]) {
