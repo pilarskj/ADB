@@ -1,14 +1,12 @@
 package adbp;
 
 import beast.base.core.Log;
-import org.apache.commons.math3.complex.Complex;
-import org.apache.commons.math3.distribution.GammaDistribution;
-import org.apache.commons.math3.transform.DftNormalization;
-import org.apache.commons.math3.transform.FastFourierTransformer;
-import org.apache.commons.math3.transform.TransformType;
-import org.apache.commons.math3.ml.distance.EuclideanDistance;
-import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
+import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
+import org.apache.commons.math3.distribution.GammaDistribution;
+import org.apache.commons.math3.ml.distance.EuclideanDistance;
+
+import org.jtransforms.fft.DoubleFFT_1D;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -20,9 +18,8 @@ import java.util.stream.IntStream;
 Class for solving the equations for P0, P1 and B
 and for calculating the likelihood of a tree based on the parameters and branching times
  */
-public class GammaLogLikelihood {
+public class GammaLogLikelihoodJT {
 
-    private static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
     private static EuclideanDistance norm = new EuclideanDistance();
     private static LinearInterpolator interpolator = new LinearInterpolator();
 
@@ -45,6 +42,7 @@ public class GammaLogLikelihood {
             return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
         } */
 
+
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
 
@@ -65,7 +63,10 @@ public class GammaLogLikelihood {
             pdf[i] = Math.exp(gammaDist.logDensity(tSeq[i])); // gammaDist.density(tSeq[i]) - use log to prevent underflow
             cdf[i] = gammaDist.cumulativeProbability(tSeq[i]);
         }
-        Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
+
+        DoubleFFT_1D fft = new DoubleFFT_1D(m);
+        double[] pdfFFT = padZeros(pdf);
+        fft.realForwardFull(pdfFFT);
 
         // calculate extinction probability over time
         double C = a * b.doubleValue(); // get lifetime
@@ -84,9 +85,9 @@ public class GammaLogLikelihood {
 
         // calculate probabilities of internal branches
         double[] B;
-        if (approx) {
+        //if (approx) {
             B = approxB(a, b.intValue(), d, intS, intE, tSeq, P0, tolB);
-        } else {
+        /*} else {
             // extend arrays (to calculate probabilities of very short internal branches)
             double[] extSeq = new double[tSeq.length + 1];
             double[] extP0 = new double[P0.length + 1];
@@ -95,7 +96,7 @@ public class GammaLogLikelihood {
             System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
             System.arraycopy(P0, 0, extP0, 1, P0.length);
             B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tolB, mB);
-        }
+        }*/
 
         // make log and sum
         double logP1 = 0;
@@ -113,7 +114,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the extinction probability
-    public static double[] calcP0(Complex[] pdfFFT, double[] cdf, double[] t, double C, double d, double rho, double dx, int maxIt, double tol) {
+    public static double[] calcP0(double[] pdfFFT, double[] cdf, double[] t, double C, double d, double rho, double dx, int maxIt, double tol) {
 
         // get length
         int n = cdf.length;
@@ -123,7 +124,7 @@ public class GammaLogLikelihood {
         for (int i = 0; i < n; i++) {
             X0[i] = (1 - rho) * (1 - cdf[i]) + d * cdf[i];
         }
-        double[] X00 = calcBDP0(t, C, d, rho); // use BD solution as initial guess (reduces computation by a few iterations)
+        double[] X00 = calcBDP0(t, C, d, rho);
 
         // set up iteration
         double err = 1;
@@ -140,7 +141,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(pdfFFT, y, n, dx);
+            double[] I = convolveFFT(pdfFFT, y, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -162,7 +163,7 @@ public class GammaLogLikelihood {
             X = Xi;
             it++;
         }
-        // System.out.println(it);
+        System.out.println(it);
 
         // for asserting convergence
         if (it == maxIt) {
@@ -175,7 +176,7 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    public static double[] calcP1(Complex[] pdfFFT, double[] cdf, double[] P0, double d, double rho,
+    public static double[] calcP1(double[] pdfFFT, double[] cdf, double[] P0, double d, double rho,
                                   double[] extT, double[] tSeq, double dx, int maxIt, double tol) {
 
         // get length
@@ -202,7 +203,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(pdfFFT, y, n, dx);
+            double[] I = convolveFFT(pdfFFT, y, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -240,7 +241,7 @@ public class GammaLogLikelihood {
         return P1;
     }
 
-
+    /*
     // Function for calculating branch probabilities
     public static double[] calcB(double a, Number b, double d,
                                  double[] s, double[] e, double[] t0, double[] P0,
@@ -331,7 +332,7 @@ public class GammaLogLikelihood {
                 });
 
         return B;
-    }
+    } */
 
 
     // Function for approximating branch probabilities
@@ -406,27 +407,40 @@ public class GammaLogLikelihood {
 
 
     // Function for partial convolution using FFT
-    public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+    public static double[] convolveFFT(double[] fx, double[] y, double eps) {
+
+        int n = y.length;
+        assert fx.length == 2*n;
 
         // perform FFT on padded y
-        Complex[] fy = fft.transform(padZeros(y), TransformType.FORWARD);
+        DoubleFFT_1D fft = new DoubleFFT_1D(n);
+        double[] fy = padZeros(y);
+        fft.realForwardFull(fy);
 
-        // element-wise multiplication of fx and fy (convolution in Fourier space)
-        Complex[] fz = new Complex[fx.length];
-        for (int i = 0; i < fx.length; i++) {
-            fz[i] = fx[i].multiply(fy[i]);
+        // element-wise multiplication of fx and fy (convolution in Fourier space, interleaved real/imaginary parts)
+        double [] fz = new double[2*n];
+        for (int i = 0; i < n; i++) {
+            // real and imaginary parts of fx and fy
+            double fxReal = fx[2 * i];
+            double fxImag = fx[2 * i + 1];
+            double fyReal = fy[2 * i];
+            double fyImag = fy[2 * i + 1];
+
+            // perform the multiplication in the Fourier domain (complex multiplication)
+            fz[2 * i] = fxReal * fyReal - fxImag * fyImag;          // real part
+            fz[2 * i + 1] = fxReal * fyImag + fxImag * fyReal;      // imaginary part
         }
 
         // perform inverse FFT to get the result back in time domain
-        Complex[] z = fft.transform(fz, TransformType.INVERSE);
+        fft.complexInverse(fz, true);
 
         // extract the real part and scale it by eps
-        double[] z_real = new double[n];
+        double[] z = new double[n];
         for (int i = 0; i < n; i++) {
-            z_real[i] = z[i].getReal() * eps;
+            z[i] = fz[2 * i] * eps;
         }
 
-        return z_real;
+        return z;
     }
 
 
