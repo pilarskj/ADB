@@ -23,38 +23,42 @@ public class GammaBranchingModelTest {
 
         // initialize
         GammaBranchingModel model = new GammaBranchingModel();
-        /*
+
         // define tree
         Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
-        Tree tree = new TreeParser( // tree with very short or long branches
-                "(((((0:50,((1:1e-07,2:1e-07)9:1e-07,3:2e-07)10:49.9999998)11:1.000000012e-07,4:50.0000001)12:1.000000012e-07,5:50.0000002)13:1.000000012e-07,(6:1e-07,7:1e-07)14:50.0000002)15:1.000000012e-07,8:50.0000004)16:0;",
-                true);
-        */
-        Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test2/rhoLow/trees/tree_1.newick", //"/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd.newick"
+
+        /* Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd.newick",
                 "IsLabelledNewick", true,
-                "adjustTipHeights", true);
+                "adjustTipHeights", true); */
 
         model.setInputValue("tree", tree);
 
         // set parameters
         model.setInputValue("lifetime", new RealParameter("5"));
-        model.setInputValue("shapeInteger", new IntegerParameter("5"));
-        //model.setInputValue("shapeReal", new RealParameter("0.1"));
-        model.setInputValue("deathprob", new RealParameter("0.05")); //0.1
+        model.setInputValue("shapeInteger", new IntegerParameter("1"));
+        // model.setInputValue("shapeReal", new RealParameter("1"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("50"));
+        model.setInputValue("origin", new RealParameter("12"));
         model.setInputValue("approx", "true");
 
         model.initAndValidate();
 
         // calculate tree LL
-        double logL = model.calculateTreeLogLikelihood(tree);
-        System.out.println(logL);
-        // assertEquals(-328.7123, logL, 0.01); (before adding the tree factor)
+        model.setInputValue("useAnalyticalBDSolution", "true");
+        double bd = model.calculateTreeLogLikelihood(tree);
+        System.out.println("BD logL = " + bd);
+
+        model.setInputValue("useAnalyticalBDSolution", "false");
+        double adb = model.calculateTreeLogLikelihood(tree);
+        System.out.println("ADB logL = " + adb);
+
+        assertEquals(adb, bd, 0.05);
     }
 
 
+    // TO REMOVE (for testing various settings)
     @Test
     public void testGammaBranchingInference() throws Exception {
 

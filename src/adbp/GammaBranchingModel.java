@@ -5,7 +5,6 @@ import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
-import beast.base.inference.StateNode;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 
@@ -45,7 +44,8 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("stepSizeB", "number of time steps for FFT for B", (int)Math.pow(2, 12));
     public Input<Boolean> approxInput =
             new Input<>("approx", "approximate branch probabilities (default true)", true);
-
+    public Input<Boolean> useAnalyticalBDSolutionInput =
+            new Input<>("useAnalyticalBDSolution", "use analytical solution if shape is 1 (default true)", true);
 
     @Override
     public void initAndValidate() {
@@ -107,14 +107,16 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         int mP = stepSizePInput.get();
         int mB = stepSizeBInput.get();
         boolean approx = approxInput.get();
+        boolean useBD = useAnalyticalBDSolutionInput.get();
 
-        return calculateTreeLogLikelihood(tree, C, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx);
+        return calculateTreeLogLikelihood(tree, C, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx, useBD);
     }
 
 
     protected double calculateTreeLogLikelihood(final TreeInterface tree,
                                                 final double C, final Number b, final double d, final double rho, final double origin,
-                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB, final boolean approx) {
+                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB,
+                                                final boolean approx, final boolean useBD) {
 
         // stop if tree origin is smaller than root height
         if (tree.getRoot().getHeight() > origin)
@@ -170,7 +172,7 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
         // calculate LogLikelihood
         double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
-                intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx);
+                intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx, useBD);
 
         return treeFactor + logL;
     }

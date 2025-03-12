@@ -31,18 +31,18 @@ public class GammaLogLikelihood {
     intS: start times of internal branches, intE: end times of internal branches, extE: end times of external branches (backwards in time)
     Options for solving integral equations -
     maxIt: maximum number of iterations, tolP: error tolerance for P0 and P1, tolB: error tolerance for branch probabilities (B),
-    mP: step size for P0 and P1, mB: step size for B, approx: approximate B?
+    mP: step size for P0 and P1, mB: step size for B, approx: approximate B?, useBD: use analytical solution for BD case (b=1)?
      */
     public static double calcLogLikelihood(double a, Number b, double d, double rho, double origin,
                                            double[] intS, double[] intE, double[] extE,
-                                           int maxIt, double tolP, double tolB, int mP, int mB, boolean approx) {
+                                           int maxIt, double tolP, double tolB, int mP, int mB, boolean approx, boolean useBD) {
 
-        /*
-        // use much simpler calculation for BD case
-        if (b.doubleValue() == 1 && d != 0.5) {
-            return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
-        } */
-
+        if (useBD) {
+            // use much simpler calculation for BD case
+            if (b.doubleValue() == 1 && d != 0.5) {
+                return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
+            }
+        }
 
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
@@ -143,6 +143,13 @@ public class GammaLogLikelihood {
             double[] Xi = new double[n];
             for (int i = 0; i < n; i++) {
                 Xi[i] = X0[i] + (1 - d) * I[i];
+            }
+
+            // add regularization: force values to be non-increasing or non-decreasing
+            if ((1-rho) > d/(1-d)) {
+                forceOrder(Xi, "non-increasing");
+            } else if ((1-rho) < d/(1-d)) {
+                forceOrder(Xi, "non-decreasing");
             }
 
             // compute error
@@ -395,7 +402,7 @@ public class GammaLogLikelihood {
 
 
     // Function for partial convolution using FFT
-    public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+    private static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
         // perform FFT on padded y
         Complex[] fy = fft.transform(padZeros(y), TransformType.FORWARD);
@@ -420,7 +427,7 @@ public class GammaLogLikelihood {
 
 
     // Helper method to pad an array with 0 to its double length
-    public static double[] padZeros(double[] x) {
+    private static double[] padZeros(double[] x) {
         int n = x.length;
         double[] xp = new double[n * 2];
         System.arraycopy(x, 0, xp, 0, n);
@@ -431,7 +438,7 @@ public class GammaLogLikelihood {
     // Helper method to find the index of the closest value in a sorted array using binary search
     // https://stackoverflow.com/questions/30245166/find-the-nearest-closest-value-in-a-sorted-list
     // complexity log(n) instead of n in a loop
-    public static int findClosestIndex(double[] array, double value) {
+    private static int findClosestIndex(double[] array, double value) {
         // if value is at boundaries
         if (value <= array[0]) {
             return 0;
@@ -468,7 +475,27 @@ public class GammaLogLikelihood {
     }
 
 
-    // simpler function for calculating the log likelihood of a birth-death-sampling tree (Stadler, JTB 2010) - for testing
+    // Helper method to enforce non-increasing or non-decreasing array
+    private static void forceOrder(double[] array, String order) {
+        if (order.equals("non-increasing")) {
+            for (int i = 1; i < array.length; i++) {
+                if (array[i] > array[i - 1]) {
+                    array[i] = array[i - 1];  // adjust to maintain non-increasing order
+                }
+            }
+        } else if (order.equals("non-decreasing")) {
+            for (int i = 1; i < array.length; i++) {
+                if (array[i] < array[i - 1]) {
+                    array[i] = array[i - 1];  // adjust to maintain non-decreasing order
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("Invalid order: use non-increasing or non-decreasing");
+        }
+    }
+
+
+    // simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)
     public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
                                              double[] intS, double[] extE) {
 
