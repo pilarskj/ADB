@@ -2,6 +2,7 @@ package adbp;
 
 import beast.base.core.Log;
 import org.apache.commons.math3.complex.Complex;
+import org.apache.commons.math3.distribution.ExponentialDistribution;
 import org.apache.commons.math3.distribution.GammaDistribution;
 import org.apache.commons.math3.transform.DftNormalization;
 import org.apache.commons.math3.transform.FastFourierTransformer;
@@ -70,17 +71,24 @@ public class GammaLogLikelihood {
         // calculate extinction probability over time
         double C = a * b.doubleValue(); // get lifetime
         final double[] P0 = calcP0(pdfFFT, cdf, tSeq, C, d, rho, dx, maxIt, tolP);
-        /* // print error if P0 is not in range
-        if (Arrays.stream(P0).min().getAsDouble() < 0 || Arrays.stream(P0).max().getAsDouble() > 1) {
-            Log.debug.println("P0 not in range [0,1]");
+        /* try {
+            writeArray(P0, "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/test_P0_lowC.csv");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } */
+        double minP0 = Arrays.stream(P0).min().getAsDouble();
+        double maxP0 = Arrays.stream(P0).max().getAsDouble();
+        if (minP0 < 0 || maxP0 > 1) {
+            System.out.println("P0 not in range [0,1], min " + minP0 + " max " + maxP0);
+        }
 
         // calculate probability of single descendants at tips
         final double[] P1 = calcP1(pdfFFT, cdf, P0, d, rho, extE, tSeq, dx, maxIt, tolP);
-        /* // print error if P1 is not in range
-        if (Arrays.stream(P1).min().getAsDouble() < 0 || Arrays.stream(P1).max().getAsDouble() > 1) {
-            Log.debug.println("P1 not in range [0,1]");
-        } */
+        double minP1 = Arrays.stream(P1).min().getAsDouble();
+        double maxP1 = Arrays.stream(P1).max().getAsDouble();
+        if (minP1 < 0 || maxP1 > 1) {
+            System.out.println("P1 not in range [0,1] min " + minP1 + " max " + maxP1);
+        }
 
         // calculate probabilities of internal branches
         double[] B;
@@ -128,7 +136,7 @@ public class GammaLogLikelihood {
         // set up iteration
         double err = 1;
         int it = 0;
-        double[] X = X00;
+        double[] X = X0;
 
         // iterate
         while (err > tol && it < maxIt) {
@@ -148,12 +156,12 @@ public class GammaLogLikelihood {
                 Xi[i] = X0[i] + (1 - d) * I[i];
             }
 
-            // force values to be non-increasing or non-decreasing
+            /*// force values to be non-increasing or non-decreasing
             if ((1-rho) > d/(1-d)) {
                 forceOrder(Xi, "non-increasing");
             } else if ((1-rho) < d/(1-d)) {
                 forceOrder(Xi, "non-decreasing");
-            }
+            } */
 
             // compute error
             err = norm.compute(Xi, X);
@@ -167,7 +175,7 @@ public class GammaLogLikelihood {
         // for asserting convergence
         if (it == maxIt) {
             // print error in debug mode
-            Log.debug.println("calcP0: max iterations reached with error:  " + err);
+            System.out.println("calcP0: max iterations reached with error:  " + err);
         }
 
         return X;
@@ -219,7 +227,7 @@ public class GammaLogLikelihood {
         }
 
         if (it == maxIt) {
-            Log.debug.println("calcP1: max iterations reached with error:  " + err);
+            System.out.println("calcP1: max iterations reached with error:  " + err);
         }
 
         // interpolate
