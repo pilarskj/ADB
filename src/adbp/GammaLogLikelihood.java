@@ -69,16 +69,34 @@ public class GammaLogLikelihood {
         // calculate extinction probability over time
         final double[] P0 = calcP0(pdfFFT, cdf, d, rho, dx, maxIt, tolP);
         /* // print error if P0 is not in range
-        if (Arrays.stream(P0).min().getAsDouble() < 0 || Arrays.stream(P0).max().getAsDouble() > 1) {
-            Log.debug.println("P0 not in range [0,1]");
+        double minP0 = Arrays.stream(P0).min().getAsDouble();
+        double maxP0 = Arrays.stream(P0).max().getAsDouble();
+        if (minP0 < 0 || maxP0 > 1) {
+            Log.debug.println("P0 not in range [0,1], min " + minP0 + " max " + maxP0);
         } */
+
+        // avoid division by 0 due to rounding errors (when conditioning on survival)
+        if (P0[m - 1] == 1.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         // calculate probability of single descendants at tips
         final double[] P1 = calcP1(pdfFFT, cdf, P0, d, rho, extE, tSeq, dx, maxIt, tolP);
         /* // print error if P1 is not in range
-        if (Arrays.stream(P1).min().getAsDouble() < 0 || Arrays.stream(P1).max().getAsDouble() > 1) {
-            Log.debug.println("P1 not in range [0,1]");
+        double minP1 = Arrays.stream(P1).min().getAsDouble();
+        double maxP1 = Arrays.stream(P1).max().getAsDouble();
+        if (minP1 < 0 || maxP1 > 1) {
+            Log.debug.println("P1 not in range [0,1] min " + minP1 + " max " + maxP1);
         } */
+
+        // sum over external branches
+        double logP1 = 0;
+        for (int i = 0; i < P1.length; i++) {
+            logP1 += Math.log(P1[i]); // if probability at some tip < 0 due to rounding errors, this will be -Infinity
+        }
+        if (logP1 == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         // calculate probabilities of internal branches
         double[] B;
@@ -95,14 +113,13 @@ public class GammaLogLikelihood {
             B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tolB, mB);
         }
 
-        // make log and sum
-        double logP1 = 0;
-        for (int i = 0; i < P1.length; i++) {
-            logP1 += Math.log(P1[i]);
-        }
+        // sum over all internal branches
         double logB = 0;
         for (int i = 0; i < B.length; i++) {
-            logB += Math.log(B[i]);
+            logB += Math.log(B[i]); // if density for some branch < 0 due to rounding errors, this will be -Infinity
+        }
+        if (logB == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
         }
 
         // sum (with conditioning on survival)
@@ -528,6 +545,9 @@ public class GammaLogLikelihood {
 
         // condition on survival
         double p0 = 1 - (rho * (lambda - mu)) / (rho * lambda + (lambda * (1 - rho) - mu) * Math.exp(-(lambda - mu) * origin));
+        if (p0 == 1.0) {
+            return Double.NEGATIVE_INFINITY; // avoid division by 0 due to rounding errors
+        }
 
         // get log likelihood
         int n = extE.length; // number of tips
