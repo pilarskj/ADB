@@ -295,7 +295,6 @@ public class GammaLogLikelihood {
                         pdf[i] = Math.exp(gammaDist.logDensity(age_seq[i]));
                         P[i] = function.value(tSeq[i]);
                     }
-                    double maxP = Arrays.stream(P).max().getAsDouble();
                     Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD); // perform FFT
 
                     // initialize
@@ -376,13 +375,12 @@ public class GammaLogLikelihood {
                     double P0M = getMean(P0Slice);
 
                     // initialize the approximation
-                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal
+                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal --> WRONG! To correct! (in Nicola's Rcpp code: k = min_num_terms)
                     double branchProb = 0;
 
-                    // int num_terms = 0;
-                    int i = k; // increase k
+                    int i = 0; // increase k (because k is not the maximal one, start with 0 and treat k as minimum number of terms)
                     double term = 1;
-                    while (term > tol) {
+                    while (term > tol || i <= k) { // only stops when both term <= tol and i > k!
                         GammaDistribution gammaDist;
                         // check if GammaDistribution with the given shape is already in the cache
                         if (gammaCache.containsKey(i + 1)) {
@@ -395,7 +393,8 @@ public class GammaLogLikelihood {
                         branchProb += term;
                         i++;
                     }
-                    int j = k - 1; // decrease k
+
+                    /* int j = k - 1; // decrease k
                     term = 1;
                     while (term > tol & j >= 0) {
                         GammaDistribution gammaDist;
@@ -409,7 +408,7 @@ public class GammaLogLikelihood {
                         term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * Math.exp(gammaDist.logDensity(ex - sx)); // calculate b_j
                         branchProb += term;
                         j--;
-                    }
+                    } */
 
                     B[x] = branchProb;
                 });

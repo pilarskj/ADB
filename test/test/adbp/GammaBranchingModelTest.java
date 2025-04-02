@@ -25,12 +25,12 @@ public class GammaBranchingModelTest {
         GammaBranchingModel model = new GammaBranchingModel();
 
         // define tree
-        Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
+        // Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
 
-        /* Tree tree = new TreeFromNewickFile();
+        Tree tree = new TreeFromNewickFile();
         tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd.newick",
                 "IsLabelledNewick", true,
-                "adjustTipHeights", true); */
+                "adjustTipHeights", true);
 
         model.setInputValue("tree", tree);
 
@@ -40,8 +40,8 @@ public class GammaBranchingModelTest {
         // model.setInputValue("shapeReal", new RealParameter("1"));
         model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("12"));
-        model.setInputValue("approx", "true");
+        model.setInputValue("origin", new RealParameter("50")); //12
+        model.setInputValue("approx", "false");
 
         model.initAndValidate();
 
@@ -54,7 +54,8 @@ public class GammaBranchingModelTest {
         double adb = model.calculateTreeLogLikelihood(tree);
         System.out.println("ADB logL = " + adb);
 
-        assertEquals(adb, bd, 0.05);
+        // account for error scaling with the number of tips/branches
+        assertEquals(adb, bd, tree.getLeafNodeCount() * 0.05);
     }
 
 
@@ -154,33 +155,33 @@ public class GammaBranchingModelTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/simulation/tree_1.upgma_2short.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd_low_sampling.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
         model.setInputValue("tree", tree);
 
         // set parameters
-        //model.setInputValue("shapeInteger", new IntegerParameter("1"));
+        model.setInputValue("shapeInteger", new IntegerParameter("1"));
         model.setInputValue("lifetime", new RealParameter("5"));
-        model.setInputValue("deathprob", new RealParameter("0.1"));
-        model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("60.5037032882197"));
+        //model.setInputValue("deathprob", new RealParameter("0.1"));
+        model.setInputValue("rho", new RealParameter("0.001"));
+        model.setInputValue("origin", new RealParameter("100"));
         model.setInputValue("approx", true);
-
-        //model.setInputValue("stepSizeP", (int)Math.pow(2, 18));
+        model.setInputValue("useAnalyticalBDSolution", false);
+        model.setInputValue("stepSizeP", (int)Math.pow(2, 18));
 
         // loop over different parameter values
-        double start = 1;
-        double end = 50;
-        double step = 1;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/simulation/loglik_shape.csv", true);
-        DecimalFormat df = new DecimalFormat("0");
+        double start = 0;
+        double end = 0.3;
+        double step = 0.02;
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/loglik_bd_low_sampling_m.csv", true);
+        DecimalFormat df = new DecimalFormat("0.00");
         for (double i = start; i <= end; i += step) {
-            model.setInputValue("shapeInteger", new IntegerParameter(Double.toString(i)));
-            //model.setInputValue("shapeReal", new RealParameter(Double.toString(i)));
+            //model.setInputValue("shapeInteger", new IntegerParameter(Double.toString(i)));
+            model.setInputValue("deathprob", new RealParameter(Double.toString(i)));
             model.initAndValidate();
             double logL = model.calculateTreeLogLikelihood(tree);
-            writer.write( df.format(i) + "," + logL + ",2short\n"); //,adbp_approx
+            writer.write( "d," + df.format(i) + "," + logL + ",2^18\n");
         }
         writer.close();
     }

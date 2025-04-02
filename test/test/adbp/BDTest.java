@@ -139,19 +139,21 @@ public class BDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd_low_sampling.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
-        double d = 0.1; // deathprob
-        // loop over different parameter values (lifetime)
-        double start = 1;
-        double end = 25;
-        double step = 0.5;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/loglik_bd.csv", true);
-        DecimalFormat df = new DecimalFormat("0.0");
+        double C = 5; // lifetime
+        //double d = 0.1; // death probability
+        double rho = 0.001; // sampling probability
+        // loop over different parameter values
+        double start = 0;
+        double end = 0.5;
+        double step = 0.02;
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/loglik_bd_low_sampling.csv", true);
+        DecimalFormat df = new DecimalFormat("0.00");
         for (double i = start; i <= end; i += step) {
-            double C = i;
+            double d = i;
             double lambda = (1 - d) / C;
             double mu = d / C;
 
@@ -159,7 +161,7 @@ public class BDTest {
             Parameterization parameterization = new CanonicalParameterization();
             parameterization.initByName(
                     "typeSet", new TypeSet(1),
-                    "processLength", new RealParameter("50"),
+                    "processLength", new RealParameter("100"),
                     "birthRate", new SkylineVectorParameter(
                             null,
                             new RealParameter(Double.toString(lambda))),
@@ -172,8 +174,8 @@ public class BDTest {
                             null,
                             new RealParameter("0")),
                     "rhoSampling", new TimedParameter(
-                            new RealParameter("50"),
-                            new RealParameter("0.1")),
+                            new RealParameter("100"),
+                            new RealParameter(Double.toString(rho))),
                     "removalProb", new SkylineVectorParameter(
                             null,
                             new RealParameter("0")));
@@ -188,7 +190,7 @@ public class BDTest {
                     "useAnalyticalSingleTypeSolution", true);
 
             double logL = density.calculateLogP();
-            writer.write(df.format(i) + "," + logL + ",bdmm\n");
+            writer.write("d," + df.format(i) + "," + logL + ",bdmm\n");
         }
         writer.close();
     }
