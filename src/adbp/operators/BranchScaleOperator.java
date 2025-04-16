@@ -1,4 +1,4 @@
-package adbp;
+package adbp.operators;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
@@ -34,11 +34,14 @@ public class BranchScaleOperator extends Operator {
             new Input<>("shape", "integer shape parameter of the ADB process", Input.Validate.REQUIRED);
     // will be modified too! add RealParameter option
 
-    public Input<Double> scaleFactorInput =
-            new Input<>("scaleFactor", "scaling factor of shape: ranges from 0 to 1 (close to zero is very large jumps, close to 1.0 is very small jumps)", 0.8);
+    final public Input<Integer> windowSizeInput =
+            new Input<>("windowSize", "the size of the window both up and down", 1);
+
+//    public Input<Double> scaleFactorInput =
+//            new Input<>("scaleFactor", "scaling factor of shape: ranges from 0 to 1 (close to zero is very large jumps, close to 1.0 is very small jumps)", 0.8);
 
     public Input<Double> branchProportionInput =
-            new Input<>("branchProportion", "proportion of internal branches to be scaled", 0.5);
+            new Input<>("branchProportion", "proportion of internal branches to be scaled", 0.1);
 
     // further parameters needed (take current samples)
     public Input<RealParameter> lifetimeInput =
@@ -52,6 +55,7 @@ public class BranchScaleOperator extends Operator {
     IntegerParameter shape;
     double branchProportion;
     double scaleFactor;
+    int windowSize;
     RealParameter lifetime;
     RealParameter origin;
 
@@ -61,9 +65,10 @@ public class BranchScaleOperator extends Operator {
         tree = treeInput.get();
         shape = shapeInput.get();
         branchProportion = branchProportionInput.get();
-        scaleFactor = scaleFactorInput.get();
+//        scaleFactor = scaleFactorInput.get();
         lifetime = lifetimeInput.get();
         origin = originInput.get();
+        windowSize = windowSizeInput.get();
     }
 
     // cf. https://github.com/CompEvol/beast2/blob/master/src/beast/base/evolution/operator/ScaleOperator.java
@@ -79,9 +84,15 @@ public class BranchScaleOperator extends Operator {
 
         // new shape: use scaling or another move?
         double scale = getScaler();
-        int b = (int) (shape.getValue() * scale);
+//        int b = (int) (shape.getValue() * scale);
+        int b = shape.getValue() + Randomizer.nextInt(2 * windowSize + 1) - windowSize;
+        if (b < 1) {
+            // invalid move, can be rejected immediately
+            return Double.NEGATIVE_INFINITY;
+        }
         shape.setValue(b);
-        hastingsRatio += -Math.log(scale);
+
+//        hastingsRatio -= Math.log(scale);
 
         // define branch length distribution
         double a = lifetime.getValue() / b;
@@ -95,9 +106,11 @@ public class BranchScaleOperator extends Operator {
         int[] randomNodeNumbers = Arrays.copyOfRange(internalNodeNumbers, 0, branchCount);
 
         // traverse nodes starting from the root, update selected branches
-        Collections.reverse(internalNodes);
-        for (Node n : internalNodes) {
+//        Collections.reverse(internalNodes); // you can instead avoid reversing by using the index, saves time
+        for (int i = internalNodes.size(); i > 0; i--) {
+            Node n = internalNodes.get(i - 1);
             if (Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getNr())) {
+                double oldBranchLength = n.getLength();
                 double newBranchLength = gammaDist.sample();
                 double newHeight;
                 if (n.isRoot()) {
@@ -106,14 +119,26 @@ public class BranchScaleOperator extends Operator {
                     newHeight = n.getParent().getHeight() - newBranchLength;
                 }
                 // check whether new branch lengths fit in the process
-                if (newHeight < 0) {
+                if (newHeight < 0 || checkForChildrenNotOnList(randomNodeNumbers, n)) {
                     return Double.NEGATIVE_INFINITY;
                 }
                 n.setHeight(newHeight);
                 // based on manipulation, add a value to hastingsRatio
+                double toCheck = Math.log(gammaDist.density(oldBranchLength) / gammaDist.density(newBranchLength));
+                double toCheck2 = (b-1) * (Math.log(oldBranchLength) - Math.log(newBranchLength)) + (newBranchLength-oldBranchLength)/a;
+                hastingsRatio += toCheck;
             }
         }
 
         return hastingsRatio; // Hastings ratio, or -Infinity if rejected
     }
+
+    private boolean checkForChildrenNotOnList(int[] randomNodeNumbers, Node n){
+        if (!Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getLeft().getNr()) && (n.getLeft().getHeight() > n.getHeight()))
+            return true;
+        if (!Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getRight().getNr()) && (n.getRight().getHeight() > n.getHeight()))
+            return true;
+        return false;
+    }
+
 }

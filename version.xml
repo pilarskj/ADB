@@ -4,5 +4,8 @@
 
   <service type="beast.base.core.BEASTInterface">
     <provider classname="adbp.GammaBranchingModel"/>
+    <provider classname="adbp.loggers.TreeStatLogger"/>
+    <provider classname="adbp.operators.BranchScaleOperator"/>
+    <provider classname="adbp.operators.UniformToLifetime"/>
   </service>
 </package>
