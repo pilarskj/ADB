@@ -130,6 +130,14 @@ public class BranchScaleOperator extends Operator {
             }
         }
 
+        // traverse the whole tree and check for negative lengths
+        // TODO isn't there a better way?
+        for (Node n : tree.getInternalNodes()) {
+            if (n.getLength() < 0) {
+                return Double.NEGATIVE_INFINITY;
+            }
+        }
+
         return hastingsRatio; // Hastings ratio, or -Infinity if rejected
     }
 
