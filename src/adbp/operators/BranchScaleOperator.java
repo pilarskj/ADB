@@ -97,8 +97,9 @@ public class BranchScaleOperator extends Operator {
 
         // define branch length distribution
         double a = lifetime.getValue() / b;
+        double a_old = lifetime.getValue() / b_old;
         GammaDistribution gammaDist = new GammaDistribution(b, a);
-        GammaDistribution gammaDistOld = new GammaDistribution(b_old, a);
+        GammaDistribution gammaDistOld = new GammaDistribution(b_old, a_old);
 
         // randomly select internal nodes, operate on branches connecting them to parents
         int branchCount = (int) (branchProportion * (tree.getInternalNodeCount() - 1));
