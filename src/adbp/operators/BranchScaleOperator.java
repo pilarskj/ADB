@@ -85,6 +85,7 @@ public class BranchScaleOperator extends Operator {
         // new shape: use scaling or another move?
         double scale = getScaler();
 //        int b = (int) (shape.getValue() * scale);
+        int b_old = shape.getValue();
         int b = shape.getValue() + Randomizer.nextInt(2 * windowSize + 1) - windowSize;
         if (b < 1) {
             // invalid move, can be rejected immediately
@@ -97,6 +98,7 @@ public class BranchScaleOperator extends Operator {
         // define branch length distribution
         double a = lifetime.getValue() / b;
         GammaDistribution gammaDist = new GammaDistribution(b, a);
+        GammaDistribution gammaDistOld = new GammaDistribution(b_old, a);
 
         // randomly select internal nodes, operate on branches connecting them to parents
         int branchCount = (int) (branchProportion * (tree.getInternalNodeCount() - 1));
@@ -124,8 +126,8 @@ public class BranchScaleOperator extends Operator {
                 }
                 n.setHeight(newHeight);
                 // based on manipulation, add a value to hastingsRatio
-                double toCheck = Math.log(gammaDist.density(oldBranchLength) / gammaDist.density(newBranchLength));
-                double toCheck2 = (b-1) * (Math.log(oldBranchLength) - Math.log(newBranchLength)) + (newBranchLength-oldBranchLength)/a;
+                double toCheck = Math.log(gammaDistOld.density(oldBranchLength) / gammaDist.density(newBranchLength));
+//                double toCheck2 = (b-1) * (Math.log(oldBranchLength) - Math.log(newBranchLength)) + (newBranchLength-oldBranchLength)/a;
                 hastingsRatio += toCheck;
             }
         }
