@@ -32,7 +32,7 @@ public class SampleBranchesOperator extends Operator {
 
     public Input<IntegerParameter> shapeInput =
             new Input<>("shape", "integer shape parameter of the ADB process", Input.Validate.REQUIRED);
-    // add RealParameter option
+    // TODO add RealParameter option
 
     final public Input<Integer> windowSizeInput =
             new Input<>("windowSize", "the size of the window both up and down", 5);
@@ -102,10 +102,10 @@ public class SampleBranchesOperator extends Operator {
         // hastingsRatio += Math.log(scale); for RandomWalk, hR = 0
         shape.setValue(newShape);
         // define new branch length distribution
-        GammaDistribution newGammaDist = new GammaDistribution(newShape, C/oldShape);
+        GammaDistribution newGammaDist = new GammaDistribution(newShape, C/newShape);
 
         // randomly select internal nodes, operate on branches connecting them to parents
-        // alternative: randomly select two tips, operate on the subtree they are in
+        // TODO test alternative: randomly select two tips, operate on the subtree they are in
         int branchCount = (int) (branchProportion * (tree.getInternalNodeCount() - 1));
         List<Node> internalNodes = tree.getInternalNodes();
         int[] internalNodeNumbers = internalNodes.stream().mapToInt(Node::getNr).toArray();
@@ -126,24 +126,14 @@ public class SampleBranchesOperator extends Operator {
                     oldBranchLength = n.getLength();
                     newHeight = n.getParent().getHeight() - newBranchLength;
                 }
-                /* // check whether new branch lengths fit in the process
-                if (newHeight < 0 ) { // || checkForChildrenNotOnList(randomNodeNumbers, n)
-                    return Double.NEGATIVE_INFINITY;
-                }
-                if (!Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getLeft().getNr()) && (newHeight < n.getLeft().getHeight())) {
-                    return Double.NEGATIVE_INFINITY;
-                }
-                if (!Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getRight().getNr()) && (newHeight < n.getRight().getHeight())) {
-                    return Double.NEGATIVE_INFINITY;
-                }*/
                 n.setHeight(newHeight);
                 // based on manipulation, add a value to hastingsRatio
-                double toCheck = Math.log(newGammaDist.density(newBranchLength)) - Math.log(oldGammaDist.density(oldBranchLength)); // or other way around?
+                double toCheck = Math.log(newGammaDist.density(newBranchLength)) - Math.log(oldGammaDist.density(oldBranchLength)); // TODO or other way around?
                 //double toCheck2 = (b-1) * (Math.log(oldBranchLength) - Math.log(newBranchLength)) + (newBranchLength-oldBranchLength)/a;
                 hastingsRatio += toCheck;
             }
         }
-        // (post-hoc, check violations in tree topology (otherwise, newHeights of children might still be higher than parent)
+        // post-hoc, check violations in tree topology (otherwise, newHeights of children might still be higher than parent)
         for (int i = internalNodes.size(); i > 0; i--) {
             Node n = internalNodes.get(i - 1);
             if (n.getHeight() < 0 || n.getHeight() < n.getLeft().getHeight() || n.getHeight() < n.getRight().getHeight()) {
