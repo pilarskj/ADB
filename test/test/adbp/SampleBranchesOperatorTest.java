@@ -99,4 +99,14 @@ public class SampleBranchesOperatorTest {
         System.out.println(tree);
     }
 
+    @Test
+    public void testSubtrees() throws Exception {
+        Tree tree = new TreeParser("(((A:10,B:10):6,(C:2,D:2):14):2,(E:7,F:7):11);", true);
+        Node n = tree.getNode(8);
+        List<Node> subtree = n.getAllChildNodesAndSelf();
+        for (Node m : subtree) {
+            System.out.println("Node number " + m.getNr() + ", height " + m.getHeight());
+        }
+    }
+
 }

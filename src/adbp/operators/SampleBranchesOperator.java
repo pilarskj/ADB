@@ -105,14 +105,25 @@ public class SampleBranchesOperator extends Operator {
         GammaDistribution newGammaDist = new GammaDistribution(newShape, C/newShape);
 
         // randomly select internal nodes, operate on branches connecting them to parents
-        // TODO test alternative: randomly select two tips, operate on the subtree they are in
         int branchCount = (int) (branchProportion * (tree.getInternalNodeCount() - 1));
         List<Node> internalNodes = tree.getInternalNodes();
         int[] internalNodeNumbers = internalNodes.stream().mapToInt(Node::getNr).toArray();
         Randomizer.shuffle(internalNodeNumbers);
         int[] randomNodeNumbers = Arrays.copyOfRange(internalNodeNumbers, 0, branchCount);
 
+        /* // alternative: randomly select an internal node, modify branch lengths in its subtree (min cherry, max whole tree)
+        // cf. https://github.com/CompEvol/beast2/blob/master/src/beast/base/evolution/operator/Uniform.java
+        final int nodeCount = tree.getNodeCount();
+        Node node;
+        do {
+            final int nodeNr = nodeCount / 2 + 1 + Randomizer.nextInt(nodeCount / 2);
+            node = tree.getNode(nodeNr);
+        } while (node.isLeaf());
+        List<Node> subtree = node.getAllChildNodesAndSelf(); // recursive, so list is already sorted from node to tips */
+
         // traverse nodes starting from the root, update selected branches
+        // for (Node n : subtree) {
+            // if (!n.isLeaf()) {
         for (int i = internalNodes.size(); i > 0; i--) {
             Node n = internalNodes.get(i - 1);
             if (Arrays.stream(randomNodeNumbers).anyMatch(x -> x == n.getNr())) {
@@ -134,20 +145,14 @@ public class SampleBranchesOperator extends Operator {
             }
         }
         // post-hoc, check violations in tree topology (otherwise, newHeights of children might still be higher than parent)
-        for (int i = internalNodes.size(); i > 0; i--) {
-            Node n = internalNodes.get(i - 1);
+        // alternative: traverse the whole tree and check for negative lengths
+        // TODO isn't there a better way?
+        for (Node n : tree.getInternalNodes()) {
+            // if (n.getLength() < 0) {
             if (n.getHeight() < 0 || n.getHeight() < n.getLeft().getHeight() || n.getHeight() < n.getRight().getHeight()) {
                 return Double.NEGATIVE_INFINITY;
             }
         }
-        
-        /* alternative: traverse the whole tree and check for negative lengths
-        // TODO isn't there a better way?
-        for (Node n : tree.getInternalNodes()) {
-            if (n.getLength() < 0) {
-                return Double.NEGATIVE_INFINITY;
-            }
-        } */
 
         return hastingsRatio;
     }
