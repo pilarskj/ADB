@@ -44,6 +44,10 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("stepSizeB", "number of time steps for FFT for B", (int)Math.pow(2, 12));
     public Input<Boolean> approxInput =
             new Input<>("approx", "approximate branch probabilities (default true)", true);
+    //public Input<Boolean> includeStemInput =
+    //        new Input<>("includeStem", "include stem in branch probabilities ", true);
+    public Input<Boolean> conditionOnRootInput =
+            new Input<>("conditionOnRoot", "condition on the root height otherwise on origin", false);
     public Input<Boolean> useAnalyticalBDSolutionInput =
             new Input<>("useAnalyticalBDSolution", "use analytical solution if shape is 1 (default true)", true);
 
@@ -107,20 +111,44 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         int mP = stepSizePInput.get();
         int mB = stepSizeBInput.get();
         boolean approx = approxInput.get();
+        //boolean includeStem = includeStemInput.get();
+        boolean conditionOnRoot = conditionOnRootInput.get();
         boolean useBD = useAnalyticalBDSolutionInput.get();
-
-        return calculateTreeLogLikelihood(tree, C, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx, useBD);
-    }
-
-
-    protected double calculateTreeLogLikelihood(final TreeInterface tree,
-                                                final double C, final Number b, final double d, final double rho, final double origin,
-                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB,
-                                                final boolean approx, final boolean useBD) {
 
         // stop if tree origin is smaller than root height
         if (tree.getRoot().getHeight() > origin)
             return Double.NEGATIVE_INFINITY;
+        // TODO: add possibility of running analysis without origin!
+
+        // calculate tree factor
+        int nTips = tree.getLeafNodeCount();
+        double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
+
+        // calculate tree likelihood based on all branching events
+        double logL;
+        if (conditionOnRoot) { // L(T|t_mrca = t_mrca) = L(T_L|t_or = t_mrca, S) * L(T_R|t_or = t_mrca, S)
+            Node root = tree.getRoot();
+            double rootHeight = root.getHeight();
+            Node childLeft = root.getChild(0);
+            Node childRight = root.getChild(1);
+            Node[] nodesLeft = childLeft.getAllChildNodesAndSelf().toArray(new Node[0]); // left subtree
+            Node[] nodesRight = childRight.getAllChildNodesAndSelf().toArray(new Node[0]); // right subtree
+
+            logL = calculateNodesLogLikelihood(nodesLeft, C, b, d, rho, rootHeight, maxIt, tolP, tolB, mP, mB, approx, useBD) +
+                    calculateNodesLogLikelihood(nodesRight, C, b, d, rho, rootHeight, maxIt, tolP, tolB, mP, mB, approx, useBD);
+        } else {
+            Node[] nodes = tree.getNodesAsArray();
+            logL = calculateNodesLogLikelihood(nodes, C, b, d, rho, origin, maxIt, tolP, tolB, mP, mB, approx, useBD);
+        }
+
+        return treeFactor + logL;
+    }
+
+
+    protected double calculateNodesLogLikelihood(final Node[] nodes,
+                                                final double C, final Number b, final double d, final double rho, final double origin,
+                                                final int maxIt, final double tolP, final double tolB, final int mP, final int mB,
+                                                final boolean approx, final boolean useBD) {
 
         // get branching times from tree
         // create empty arrays to store start and end times of branches
@@ -129,13 +157,20 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double[] extE = new double[0];
 
         // traverse all nodes and compute start/end times of all branches (backwards in time)
+        //Node[] nodes = tree.getNodesAsArray(); // allNodes
+        //Node[] nodes;
+        /*
+        if (includeStem) {
+            nodes = allNodes;
+        } else {
+            assert allNodes[allNodes.length - 1].isRoot();
+            nodes = Arrays.copyOfRange(allNodes, 0, allNodes.length - 1);
+        } */
         // alternatively, use Branch/ BranchList classes
-        for (int i = 0; i < tree.getNodeCount(); i++) {
-            Node node = tree.getNode(i);
+        for (Node node : nodes) {
 
             // start time is the node height (or divergence time of the node)
             double startTime = node.getHeight();
-
             double endTime;
             if (node.isRoot()) {
                 // end time is the tree origin
@@ -158,23 +193,24 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             }
         }
 
-        // check node numbers
+        /*  // check node numbers
         int nTips = tree.getLeafNodeCount();
         assert extE.length == nTips;
-        assert intS.length == tree.getInternalNodeCount();
-        assert intE.length == tree.getInternalNodeCount();
-
-        // calculate tree factor
-        double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
+        if (includeStem) {
+            assert intS.length == tree.getInternalNodeCount();
+            assert intE.length == tree.getInternalNodeCount();
+        } else {
+            assert intS.length == tree.getInternalNodeCount() - 1;
+            assert intE.length == tree.getInternalNodeCount() - 1;
+        } */
 
         // get scale parameter of the Gamma distribution
         double a = C / b.doubleValue();
 
         // calculate LogLikelihood
-        double logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
+        return GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
                 intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx, useBD);
 
-        return treeFactor + logL;
     }
 
 

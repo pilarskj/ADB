@@ -1,6 +1,7 @@
 package test.adbp;
 
 import adbp.GammaBranchingModel;
+import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.parameter.IntegerParameter;
@@ -13,10 +14,44 @@ import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.DecimalFormat;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GammaBranchingModelTest {
+
+    @Test
+    public void testTreeTraversal() throws Exception {
+
+        // define tree
+        Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
+
+        for (int i = 0; i < tree.getNodeCount(); i++) {
+            Node node = tree.getNode(i);
+            System.out.println(node);
+        }
+
+        /* Node[] allNodes = tree.getNodesAsArray();
+        Node[] nodes = Arrays.copyOfRange(allNodes, 0, allNodes.length - 1);
+        for (Node node : nodes) {
+            System.out.println(node);
+        } */
+
+        Node root = tree.getRoot();
+        double rootHeight = root.getHeight();
+        System.out.println(rootHeight);
+
+        Node childLeft = root.getChild(0);
+        Node childRight = root.getChild(1);
+        Node[] nodesLeft = childLeft.getAllChildNodesAndSelf().toArray(new Node[0]); // left subtree
+        for (Node node : nodesLeft) {
+            System.out.println(node);
+        }
+        Node[] nodesRight = childRight.getAllChildNodesAndSelf().toArray(new Node[0]); // right subtree
+        for (Node node : nodesRight) {
+            System.out.println(node);
+        }
+    }
 
     @Test
     public void testGammaBranchingModel() throws Exception {
@@ -28,7 +63,7 @@ public class GammaBranchingModelTest {
         // Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
 
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd.newick",
+        tree.initByName("fileName", "examples/tree_bd.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -42,6 +77,8 @@ public class GammaBranchingModelTest {
         model.setInputValue("rho", new RealParameter("0.1"));
         model.setInputValue("origin", new RealParameter("50")); //12
         model.setInputValue("approx", "false");
+        //model.setInputValue("includeStem", "false");
+        model.setInputValue("conditionOnRoot", "true");
 
         model.initAndValidate();
 
@@ -155,33 +192,34 @@ public class GammaBranchingModelTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd_low_sampling.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test1/trees/tree_1.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
         model.setInputValue("tree", tree);
 
         // set parameters
-        model.setInputValue("shapeInteger", new IntegerParameter("1"));
-        model.setInputValue("lifetime", new RealParameter("5"));
-        //model.setInputValue("deathprob", new RealParameter("0.1"));
-        model.setInputValue("rho", new RealParameter("0.001"));
-        model.setInputValue("origin", new RealParameter("100"));
+        model.setInputValue("shapeInteger", new IntegerParameter("5"));
+        //model.setInputValue("lifetime", new RealParameter("5"));
+        model.setInputValue("deathprob", new RealParameter("0.1"));
+        model.setInputValue("rho", new RealParameter("0.1"));
+        model.setInputValue("origin", new RealParameter("60.5037032882197"));
         model.setInputValue("approx", true);
-        model.setInputValue("useAnalyticalBDSolution", false);
+        //model.setInputValue("useAnalyticalBDSolution", false);
         model.setInputValue("stepSizeP", (int)Math.pow(2, 18));
+        //model.setInputValue("toleranceP", 1e-6);
 
         // loop over different parameter values
-        double start = 0;
-        double end = 0.3;
-        double step = 0.02;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/loglik_bd_low_sampling_m.csv", true);
-        DecimalFormat df = new DecimalFormat("0.00");
+        double start = 1;
+        double end = 20;
+        double step = 1;
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/test1/loglik_tree_1_m.csv", true);
+        DecimalFormat df = new DecimalFormat("0");
         for (double i = start; i <= end; i += step) {
             //model.setInputValue("shapeInteger", new IntegerParameter(Double.toString(i)));
-            model.setInputValue("deathprob", new RealParameter(Double.toString(i)));
+            model.setInputValue("lifetime", new RealParameter(Double.toString(i)));
             model.initAndValidate();
             double logL = model.calculateTreeLogLikelihood(tree);
-            writer.write( "d," + df.format(i) + "," + logL + ",2^18\n");
+            writer.write( df.format(i) + "," + logL + ",2^18\n");
         }
         writer.close();
     }

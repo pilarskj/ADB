@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+
 /*
 Class for solving the equations for P0, P1 and B
 and for calculating the likelihood of a tree based on the parameters and branching times
@@ -525,7 +526,7 @@ public class GammaLogLikelihood {
         t[t.length - 1] = origin;
 
         // get branch probabilities (no sampling through time)
-        double c1 = lambda - mu;
+        double c1 = Math.abs(lambda - mu);
         double c2 = -(lambda - mu - 2 * lambda * rho) / c1;
         double[] B = new double[t.length];
         IntStream.range(0, t.length)

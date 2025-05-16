@@ -38,9 +38,10 @@ public class BDTest {
         model.setInputValue("deathRate", new RealParameter("0.02"));
         model.setInputValue("samplingRate", new RealParameter("0"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("50"));
+        //model.setInputValue("origin", new RealParameter("50"));
         model.setInputValue("contemp", "true");
-        model.setInputValue("conditionOnSurvival", "true");
+        //model.setInputValue("conditionOnSurvival", "true");
+        model.setInputValue("conditionOnRoot", "true");
 
         model.initAndValidate();
 
@@ -89,6 +90,7 @@ public class BDTest {
                 "tree", tree,
                 "typeLabel", "type",
                 "parallelize", false,
+                "conditionOnRoot", true, // TODO check why different from BDSKY - tree factor?
                 "useAnalyticalSingleTypeSolution", true);
 
         double logL = density.calculateLogP();
