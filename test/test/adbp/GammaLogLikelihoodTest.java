@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+// A small test for the main function in GammaLogLikelihood class
 public class GammaLogLikelihoodTest {
 
     @Test

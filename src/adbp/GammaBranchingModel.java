@@ -12,16 +12,16 @@ import java.util.Arrays;
 
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
+
 @Description("This model implements an Age-Dependent Branching Process " +
-        "with lifetimes distributed according to a Gamma distribution with integer shape parameter (Erlang distribution), " +
-        "a death probability and extant sampling.")
+        "with Gamma (or Erlang)-distributed lifetimes, some death probability and extant sampling.")
 public class GammaBranchingModel extends SpeciesTreeDistribution {
 
     // parametrization
     final public Input<RealParameter> lifetimeParameterInput =
             new Input<>("lifetime", "expected lifetime", Input.Validate.REQUIRED);
     final public Input<IntegerParameter> shapeIntegerParameterInput =
-            new Input<>("shapeInteger", "integer shape parameter of the Gamma distribution");
+            new Input<>("shapeInteger", "integer shape parameter of the Erlang distribution");
     final public Input<RealParameter> shapeRealParameterInput =
             new Input<>("shapeReal", "real shape parameter of the Gamma distribution");
     final public Input<RealParameter> deathParameterInput =
@@ -44,8 +44,6 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("stepSizeB", "number of time steps for FFT for B", (int)Math.pow(2, 12));
     public Input<Boolean> approxInput =
             new Input<>("approx", "approximate branch probabilities (default true)", true);
-    //public Input<Boolean> includeStemInput =
-    //        new Input<>("includeStem", "include stem in branch probabilities ", true);
     public Input<Boolean> conditionOnRootInput =
             new Input<>("conditionOnRoot", "condition on the root height otherwise on origin", false);
     public Input<Boolean> useAnalyticalBDSolutionInput =
@@ -93,8 +91,8 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     public double calculateTreeLogLikelihood(final TreeInterface tree) {
 
         // parameters
-        double C = lifetimeParameterInput.get().getValue();
-        Number b = null;
+        double C = lifetimeParameterInput.get().getValue(); // l
+        Number b = null; // k
         if (shapeIntegerParameterInput.get() != null) {
             b = shapeIntegerParameterInput.get().getValue();
         } else if (shapeRealParameterInput.get() != null) {
@@ -111,7 +109,6 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         int mP = stepSizePInput.get();
         int mB = stepSizeBInput.get();
         boolean approx = approxInput.get();
-        //boolean includeStem = includeStemInput.get();
         boolean conditionOnRoot = conditionOnRootInput.get();
         boolean useBD = useAnalyticalBDSolutionInput.get();
 
@@ -157,16 +154,6 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double[] extE = new double[0];
 
         // traverse all nodes and compute start/end times of all branches (backwards in time)
-        //Node[] nodes = tree.getNodesAsArray(); // allNodes
-        //Node[] nodes;
-        /*
-        if (includeStem) {
-            nodes = allNodes;
-        } else {
-            assert allNodes[allNodes.length - 1].isRoot();
-            nodes = Arrays.copyOfRange(allNodes, 0, allNodes.length - 1);
-        } */
-        // alternatively, use Branch/ BranchList classes
         for (Node node : nodes) {
 
             // start time is the node height (or divergence time of the node)
@@ -194,15 +181,9 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         }
 
         /*  // check node numbers
-        int nTips = tree.getLeafNodeCount();
-        assert extE.length == nTips;
-        if (includeStem) {
-            assert intS.length == tree.getInternalNodeCount();
-            assert intE.length == tree.getInternalNodeCount();
-        } else {
-            assert intS.length == tree.getInternalNodeCount() - 1;
-            assert intE.length == tree.getInternalNodeCount() - 1;
-        } */
+        assert extE.length == tree.getLeafNodeCount();
+        assert intS.length == tree.getInternalNodeCount();
+        */
 
         // get scale parameter of the Gamma distribution
         double a = C / b.doubleValue();
@@ -210,7 +191,6 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         // calculate LogLikelihood
         return GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin,
                 intS, intE, extE, maxIt, tolP, tolB, mP, mB, approx, useBD);
-
     }
 
 

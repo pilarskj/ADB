@@ -17,7 +17,7 @@ import java.util.stream.IntStream;
 
 /*
 Class for solving the equations for P0, P1 and B
-and for calculating the likelihood of a tree based on the parameters and branching times
+and for calculating the probability of a tree based on its branching times given the ADB model parameters
  */
 public class GammaLogLikelihood {
 
@@ -28,7 +28,7 @@ public class GammaLogLikelihood {
 
     // Main function for calculating the likelihood of the tree
     /* Inputs
-    a: scale, b: shape, d: death probability, rho: sampling probability, origin: age of the tree
+    a: scale (theta), b: shape (k), d: death probability, rho: sampling probability, origin: age of the tree
     intS: start times of internal branches, intE: end times of internal branches, extE: end times of external branches (backwards in time)
     Options for solving integral equations -
     maxIt: maximum number of iterations, tolP: error tolerance for P0 and P1, tolB: error tolerance for branch probabilities (B),
@@ -376,10 +376,10 @@ public class GammaLogLikelihood {
                     double P0M = getMean(P0Slice);
 
                     // initialize the approximation
-                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal --> WRONG! To correct! (in Nicola's Rcpp code: k = min_num_terms)
+                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal // TODO: check!
                     double branchProb = 0;
 
-                    int i = 0; // increase k (because k is not the maximal one, start with 0 and treat k as minimum number of terms)
+                    int i = 0; // increase (start with 0 and treat k as minimum number of terms)
                     double term = 1;
                     while (term > tol || i <= k) { // only stops when both term <= tol and i > k!
                         GammaDistribution gammaDist;
@@ -394,22 +394,6 @@ public class GammaLogLikelihood {
                         branchProb += term;
                         i++;
                     }
-
-                    /* int j = k - 1; // decrease k
-                    term = 1;
-                    while (term > tol & j >= 0) {
-                        GammaDistribution gammaDist;
-                        // check if GammaDistribution with the given shape is already in the cache
-                        if (gammaCache.containsKey(j + 1)) {
-                            gammaDist = gammaCache.get(j + 1);
-                        } else { // otherwise, add it
-                            gammaDist = new GammaDistribution((j + 1) * b, a);
-                            gammaCache.put(j + 1, gammaDist);
-                        }
-                        term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * Math.exp(gammaDist.logDensity(ex - sx)); // calculate b_j
-                        branchProb += term;
-                        j--;
-                    } */
 
                     B[x] = branchProb;
                 });
@@ -512,7 +496,7 @@ public class GammaLogLikelihood {
     }
 
 
-    // simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)
+    // Simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)
     public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
                                              double[] intS, double[] extE) {
 
