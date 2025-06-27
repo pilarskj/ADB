@@ -88,16 +88,16 @@ public class GammaBranchingModelTest {
     }
 
 
-    // compare runtime for exact vs. approximated branch probabilities
+    // compare likelihood calculation with exact vs. approximated branch probabilities (runtime and error)
     // see https://github.com/pilarskj/ADB-analysis/treesize_comparison
     @Test
-    public void testApproximationRuntime() throws Exception {
+    public void testApproximation() throws Exception {
 
         // declare in- and out-files
         BufferedReader br = new BufferedReader(new FileReader("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/tree_data.csv"));
-        BufferedWriter bw = new BufferedWriter(new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/runtime_likelihood.csv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/tree_likelihood.csv"));
         br.readLine(); // skip header in the input
-        bw.write("tree,ntips,exact_time,approx_time\n");  // add header in the output
+        bw.write("tree,ntips,exact_time,exact_logL,approx_time,approx_logL\n");  // add header in the output
 
         // read each line from the csv
         String line;
@@ -125,7 +125,7 @@ public class GammaBranchingModelTest {
                     "origin", new RealParameter(values[2]),
                     "approx", false);
             startTime = System.nanoTime();
-            exact.calculateTreeLogLikelihood(tree);
+            double exactLik = exact.calculateTreeLogLikelihood(tree);
             endTime = System.nanoTime();
             double exactTime = (endTime - startTime) / 1e+6 ;  // divide to ms
 
@@ -138,11 +138,11 @@ public class GammaBranchingModelTest {
                     "origin", new RealParameter(values[2]),
                     "approx", true);
             startTime = System.nanoTime();
-            approx.calculateTreeLogLikelihood(tree);
+            double approxLik = approx.calculateTreeLogLikelihood(tree);
             endTime = System.nanoTime();
             double approxTime = (endTime - startTime) / 1e+6 ;  // divide to ms
 
-            bw.write(treeNr + "," + nTips + "," + exactTime + "," + approxTime);
+            bw.write(treeNr + "," + nTips + "," + exactTime + "," + exactLik + "," + approxTime + "," + approxLik);
             bw.newLine();
         }
         bw.close();
