@@ -1,4 +1,4 @@
-package adbp;
+package adb;
 
 import beast.base.core.Log;
 import org.apache.commons.math3.complex.Complex;

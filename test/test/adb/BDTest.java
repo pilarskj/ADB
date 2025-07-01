@@ -1,6 +1,6 @@
-package test.adbp;
+package test.adb;
 
-import adbp.GammaBranchingModel;
+import adb.GammaBranchingModel;
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
 import bdsky.evolution.speciation.BirthDeathSkylineModel;

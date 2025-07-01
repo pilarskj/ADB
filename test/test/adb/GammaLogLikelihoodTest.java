@@ -1,6 +1,6 @@
-package test.adbp;
+package test.adb;
 
-import adbp.GammaLogLikelihood;
+import adb.GammaLogLikelihood;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

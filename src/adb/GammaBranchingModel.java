@@ -1,4 +1,4 @@
-package adbp;
+package adb;
 
 import beast.base.core.*;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
