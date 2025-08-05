@@ -13,6 +13,8 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.text.DecimalFormat;
+import java.util.List;
 
 
 // Test likelihood calculation under ADB
@@ -88,7 +90,7 @@ public class GammaBranchingModelTest {
     }
 
 
-    // compare likelihood calculation with exact vs. approximated branch probabilities (runtime and error)
+    // compare likelihood calculation with exact vs. approximated branch probabilities for trees of different sizes (runtime and error)
     // see https://github.com/pilarskj/ADB-analysis/treesize_comparison
     @Test
     public void testApproximation() throws Exception {
@@ -143,6 +145,195 @@ public class GammaBranchingModelTest {
             double approxTime = (endTime - startTime) / 1e+6 ;  // divide to ms
 
             bw.write(treeNr + "," + nTips + "," + exactTime + "," + exactLik + "," + approxTime + "," + approxLik);
+            bw.newLine();
+        }
+        bw.close();
+    }
+
+
+    // compare likelihood calculation on large trees with exact vs. approximated branch probabilities for a range of death probabilities
+    // see https://github.com/pilarskj/ADB-analysis/treesize_comparison
+    @Test
+    public void testApproximationSeqParallel() throws Exception {
+
+        // declare in- and out-files
+        BufferedReader br = new BufferedReader(new FileReader("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/tree_data.csv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/tree_likelihood_death.csv"));
+        br.readLine(); // skip header in the input
+        DecimalFormat df = new DecimalFormat("0.000"); // format death probabilities
+
+        // read and filter lines in memory
+        List<String> filteredLines;
+        filteredLines = br.lines()
+                .map(String::trim)
+                .filter(line -> {
+                    String[] values = line.split(",");
+                    int treeNr = Integer.parseInt(values[0]);
+                    int nTips = Integer.parseInt(values[1]);
+                    return (treeNr == 2 || treeNr == 3 || treeNr == 4) && nTips == 5000;})
+                .toList();
+
+        // process each tree line in parallel
+        List<String> results = filteredLines.parallelStream()
+                .flatMap(line -> {
+                    System.out.println(line);
+                    String[] values = line.split(",");
+                    int treeNr = Integer.parseInt(values[0]);
+                    int nTips = Integer.parseInt(values[1]);
+                    String originS = values[2];
+
+                    Tree tree = new TreeFromNewickFile();
+                    tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/treesize_comparison/trees/tree_n" + nTips + "_" + treeNr + ".newick",
+                            "IsLabelledNewick", true, "adjustTipHeights", true);
+
+                    return java.util.stream.IntStream.rangeClosed(0, 9)  // define steps
+                            .mapToObj(k -> {
+                                double deathProb = 0.055 + 0.01 * k;
+                                // exact
+                                GammaBranchingModel exact = new GammaBranchingModel();
+                                exact.initByName("tree", tree,
+                                        "lifetime", new RealParameter("10"),
+                                        "shapeInteger", new IntegerParameter("5"),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter("0.1"),
+                                        "origin", new RealParameter(originS),
+                                        "approx", false);
+                                double exactLik = exact.calculateTreeLogLikelihood(tree);
+
+                                // approx
+                                GammaBranchingModel approx = new GammaBranchingModel();
+                                approx.initByName("tree", tree,
+                                        "lifetime", new RealParameter("10"),
+                                        "shapeInteger", new IntegerParameter("5"),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter("0.1"),
+                                        "origin", new RealParameter(originS),
+                                        "approx", true);
+                                double approxLik = approx.calculateTreeLogLikelihood(tree);
+
+                                return treeNr + "," + df.format(deathProb) + "," + exactLik + "," + approxLik;
+                            });
+                })
+                .toList();
+
+        // write all results to file
+        bw.write("tree,deathprob,exact_logL,approx_logL\n");
+        for (String resultLine : results) {
+            bw.write(resultLine);
+            bw.newLine();
+        }
+        bw.close();
+    }
+
+    // compare likelihood calculation with exact vs. approximated branch probabilities for a range of death probabilities in a more systematic way
+    // see https://github.com/pilarskj/ADB-analysis/accuracy_evaluation
+    @Test
+    public void testApproximationGrid() throws Exception {
+
+        // declare in- and out-files
+        BufferedReader br = new BufferedReader(new FileReader("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/trees_grid_sampling.tsv"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/loglik_grid_sampling.csv"));
+        br.readLine(); // skip header in the input
+        DecimalFormat df = new DecimalFormat("0.00"); // format death probabilities
+
+        // read and filter lines in memory
+        List<String> lines;
+        lines = br.lines().map(String::trim).toList();
+
+        // process each tree line in parallel
+        List<String> results = lines.parallelStream()
+                .flatMap(line -> {
+                    System.out.println(line);
+                    String[] values = line.split("\t");
+                    int treeNr = Integer.parseInt(values[0]);
+                    String kS = values[1];
+                    String rhoS = values[2];
+                    String treeS = values[3];
+                    String originS = values[4];
+
+                    Tree tree = new TreeParser(treeS, true);
+
+                    return java.util.stream.IntStream.rangeClosed(0, 50)
+                            .mapToObj(i -> {
+                                double deathProb = 0.01 * i;
+                                // double lifetime = 1 + 0.2 * i;
+
+                                // step sizes
+                                GammaBranchingModel ss10 = new GammaBranchingModel();
+                                ss10.initByName("tree", tree,
+                                        "lifetime", new RealParameter("5"), // Double.toString(lifetime)
+                                        "shapeInteger", new IntegerParameter(kS),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter(rhoS),
+                                        "origin", new RealParameter(originS),
+                                        "approx", true,
+                                        "useAnalyticalBDSolution", false,
+                                        "stepSizeP", (int)Math.pow(2, 10)
+                                        );
+                                double ss10Lik = ss10.calculateTreeLogLikelihood(tree);
+
+                                GammaBranchingModel ss12 = new GammaBranchingModel();
+                                ss12.initByName("tree", tree,
+                                        "lifetime", new RealParameter("5"), // Double.toString(lifetime)
+                                        "shapeInteger", new IntegerParameter(kS),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter(rhoS),
+                                        "origin", new RealParameter(originS),
+                                        "approx", true,
+                                        "useAnalyticalBDSolution", false,
+                                        "stepSizeP", (int)Math.pow(2, 12)
+                                );
+                                double ss12Lik = ss12.calculateTreeLogLikelihood(tree);
+
+                                GammaBranchingModel ss14 = new GammaBranchingModel();
+                                ss14.initByName("tree", tree,
+                                        "lifetime", new RealParameter("5"), // Double.toString(lifetime)
+                                        "shapeInteger", new IntegerParameter(kS),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter(rhoS),
+                                        "origin", new RealParameter(originS),
+                                        "approx", true,
+                                        "useAnalyticalBDSolution", false,
+                                        "stepSizeP", (int)Math.pow(2, 14)
+                                );
+                                double ss14Lik = ss14.calculateTreeLogLikelihood(tree);
+
+                                /*
+                                // exact
+                                GammaBranchingModel exact = new GammaBranchingModel();
+                                exact.initByName("tree", tree,
+                                        "lifetime", new RealParameter("10"),
+                                        "shapeInteger", new IntegerParameter(kS),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter("0.1"),
+                                        "origin", new RealParameter(originS),
+                                        "approx", false,
+                                        "useAnalyticalBDSolution", false);
+                                double exactLik = exact.calculateTreeLogLikelihood(tree);
+
+                                // approx
+                                GammaBranchingModel approx = new GammaBranchingModel();
+                                approx.initByName("tree", tree,
+                                        "lifetime", new RealParameter("10"),
+                                        "shapeInteger", new IntegerParameter(kS),
+                                        "deathprob", new RealParameter(Double.toString(deathProb)),
+                                        "rho", new RealParameter("0.1"),
+                                        "origin", new RealParameter(originS),
+                                        "approx", true,
+                                        "useAnalyticalBDSolution", false);
+                                double approxLik = approx.calculateTreeLogLikelihood(tree);
+                                */
+                                //return treeNr + "," + df.format(deathProb) + "," + exactLik + "," + approxLik;
+                                return treeNr + ",deathprob," + df.format(deathProb) + "," + ss10Lik + "," + ss12Lik + "," + ss14Lik;
+                            });
+                })
+                .toList();
+
+        // write all results to file
+        // bw.write("tree,deathprob,exact_logL,approx_logL\n");
+        bw.write("tree,param,value,ss10_logL,ss12_logL,ss14_logL\n");
+        for (String resultLine : results) {
+            bw.write(resultLine);
             bw.newLine();
         }
         bw.close();
