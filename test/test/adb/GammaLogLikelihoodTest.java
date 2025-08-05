@@ -3,6 +3,8 @@ package test.adb;
 import adb.GammaLogLikelihood;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 // A small test for the main function in GammaLogLikelihood class
@@ -31,19 +33,15 @@ public class GammaLogLikelihoodTest {
         int mB = (int)Math.pow(2, 12);
 
         // analytical BD estimate
-        double bd = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin, intS, intE, extE,
-                maxIt, tolP, tolB, mP, mB, false, true);
+        double bd = GammaLogLikelihood.calcBDLogLikelihood(a, d, rho, origin, intS, extE);
         System.out.println("BD logL = " + bd);
 
         // ADB exact FFT solution
-        double adb = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, origin, intS, intE, extE,
-                maxIt, tolP, tolB, mP, mB, false, false);
+        GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, origin, mP);
+        double[] P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
+        double[] P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
+        double adb = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, intS, intE, extE, maxIt, tolB, mB, false);
         System.out.println("ADB logL = " + adb);
-
         assertEquals(adb, bd,  0.05);
     }
 }
-
-
-
-

@@ -38,16 +38,16 @@ public class BDTest {
         model.setInputValue("deathRate", new RealParameter("0.02"));
         model.setInputValue("samplingRate", new RealParameter("0"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("50"));
-        model.setInputValue("contemp", "true");
-        model.setInputValue("conditionOnSurvival", "true");
-        //model.setInputValue("conditionOnRoot", "true");
+        // model.setInputValue("origin", new RealParameter("50"));
+        model.setInputValue("contemp", true);
+        model.setInputValue("conditionOnSurvival", true);
+        model.setInputValue("conditionOnRoot", true);
 
         model.initAndValidate();
 
         // calculate tree LL
         double logL = model.calculateTreeLogLikelihood(tree);
-        System.out.println(logL); // -348.3790 value matches with ADB without tree factor (has been discarded)
+        System.out.println(logL); // -348.3790 value matches with ADB without tree factor (has been discarded); value with conditioning on the root also matches
     }
 
     @Test
@@ -93,7 +93,7 @@ public class BDTest {
                 "useAnalyticalSingleTypeSolution", true);
 
         double logL = density.calculateLogP();
-        System.out.println(logL); // -643.4968 value matches with ADB
+        System.out.println(logL); // -643.4968 value matches with ADB (slight difference when conditioning on the root - other definition?)
     }
 
     @Test
@@ -115,16 +115,17 @@ public class BDTest {
         model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
         model.setInputValue("origin", new RealParameter("50"));
-        model.setInputValue("approx", "approx");
+        // model.setInputValue("conditionOnRoot", true);
+        model.setInputValue("approx", true);
 
         model.initAndValidate();
 
         // calculate tree LL
-        model.setInputValue("useAnalyticalBDSolution", "true");
+        model.setInputValue("useAnalyticalBDSolution", true);
         double bd = model.calculateTreeLogLikelihood(tree);
         System.out.println("BD logL = " + bd); // -643.4968
 
-        model.setInputValue("useAnalyticalBDSolution", "false");
+        model.setInputValue("useAnalyticalBDSolution", false);
         double adb = model.calculateTreeLogLikelihood(tree);
         System.out.println("ADB logL = " + adb); // -643.8421
 
