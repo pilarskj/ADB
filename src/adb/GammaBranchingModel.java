@@ -106,6 +106,16 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         double d = deathParameterInput.get().getValue();
         double rho = rhoParameterInput.get().getValue();
 
+        double origin = 0; // initialize and update with provided origin
+        if (originInput.get() != null) {
+            origin = originInput.get().getValue();
+
+            // stop if tree origin is smaller than root height
+            if (tree.getRoot().getHeight() >= origin) {
+                return Double.NEGATIVE_INFINITY;
+            }
+        }
+
         // options
         int maxIt = maxIterationsInput.get();
         double tolP = tolerancePInput.get();
@@ -157,14 +167,9 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             }
 
         } else {
+            assert origin > 0;
 
-            double origin = originInput.get().getValue();
-
-            // stop if tree origin is smaller than root height
-            if (tree.getRoot().getHeight() > origin)
-                return Double.NEGATIVE_INFINITY;
-
-            // collect branching times per subtree
+            // collect branching times of the tree
             Node[] nodes = tree.getNodesAsArray();
             BranchingTimes branches = traverseTree(nodes, origin);
 
