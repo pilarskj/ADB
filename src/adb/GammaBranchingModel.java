@@ -3,6 +3,7 @@ package adb;
 import beast.base.core.*;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
+import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
 import beast.base.inference.parameter.IntegerParameter;
@@ -49,6 +50,16 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     public Input<Boolean> useAnalyticalBDSolutionInput =
             new Input<>("useAnalyticalBDSolution", "use analytical solution if shape is 1 (default true)", true);
 
+    // arrays to store heavy calculations
+    protected boolean recalculateP;
+    protected double[] seq; // discretized time array
+    protected double[] P0;
+    protected double[] P1;
+    protected double[] storedSeq;
+    protected double[] storedP0;
+    protected double[] storedP1;
+
+
     @Override
     public void initAndValidate() {
         super.initAndValidate();
@@ -83,6 +94,11 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         if (!isPowerOfTwo(stepSizeBInput.get())) {
             throw new IllegalArgumentException("stepSizeB must be a power of 2");
         }
+
+        // initialize arrays - will be computed in first iteration
+        double[] seq = null;
+        double[] P0 = null;
+        double[] P1 = null;
     }
 
 
@@ -155,14 +171,17 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
                         GammaLogLikelihood.calcBDLogLikelihood(a, d, rho, rootHeight, rightSubtree.intS, rightSubtree.extE);
             } else {
 
-                // get densities, P0 and P1
-                GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, rootHeight, mP);
-                double[] P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
-                double[] P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
+                if (seq == null || P0 == null || P1 == null || recalculateP) {
+                    // get densities, P0 and P1
+                    GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, rootHeight, mP);
+                    seq = densities.seq;
+                    P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
+                    P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
+                }
 
                 // calculate likelihood
-                logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, leftSubtree.intS, leftSubtree.intE, leftSubtree.extE, maxIt, tolB, mB, approx) +
-                        GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, rightSubtree.intS, rightSubtree.intE, rightSubtree.extE, maxIt, tolB, mB, approx);
+                logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, seq, P0, P1, leftSubtree.intS, leftSubtree.intE, leftSubtree.extE, maxIt, tolB, mB, approx) +
+                        GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, seq, P0, P1, rightSubtree.intS, rightSubtree.intE, rightSubtree.extE, maxIt, tolB, mB, approx);
 
             }
 
@@ -178,13 +197,16 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
                 logL = GammaLogLikelihood.calcBDLogLikelihood(a, d, rho, origin, branches.intS, branches.extE);
             } else {
 
-                // get densities, P0 and P1
-                GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, origin, mP);
-                double[] P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
-                double[] P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
+                if (seq == null || P0 == null || P1 == null || recalculateP) {
+                    // get densities, P0 and P1
+                    GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, origin, mP);
+                    seq = densities.seq;
+                    P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
+                    P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
+                }
 
                 // calculate likelihood
-                logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, branches.intS, branches.intE, branches.extE, maxIt, tolB, mB, approx);
+                logL = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, seq, P0, P1, branches.intS, branches.intE, branches.extE, maxIt, tolB, mB, approx);
 
             }
         }
@@ -247,7 +269,49 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
 
     @Override
     protected boolean requiresRecalculation() {
-        return true;
+        // check whether current state requires re-calculation of P0 and P1
+        recalculateP = false;
+        if (lifetimeParameterInput.get().somethingIsDirty() ||
+                deathParameterInput.get().somethingIsDirty() ||
+                rhoParameterInput.get().somethingIsDirty()) {
+            recalculateP = true;
+        }
+        if (shapeIntegerParameterInput.get() != null) {
+            if (shapeIntegerParameterInput.get().somethingIsDirty()) {
+                recalculateP = true;
+            }
+        }
+        if (shapeRealParameterInput.get() != null) {
+            if (shapeRealParameterInput.get().somethingIsDirty()) {
+                recalculateP = true;
+            }
+        }
+        if (conditionOnRootInput.get()) {
+            if (treeInput.get().getRoot().isDirty() != Tree.IS_CLEAN) {
+                recalculateP = true;
+            }
+        }
+        return true; // always recalculate likelihood
+    }
+
+
+    @Override
+    public void store() {
+        super.store();
+        // store deep copies
+        storedSeq = seq.clone();
+        storedP0 = P0.clone();
+        storedP1 = P1.clone();
+    }
+
+
+    @Override
+    public void restore() {
+        super.restore();
+        // restore from backups
+        seq = storedSeq;
+        P0 = storedP0;
+        P1 = storedP1;
     }
 
 

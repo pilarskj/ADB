@@ -40,7 +40,7 @@ public class GammaLogLikelihoodTest {
         GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, origin, mP);
         double[] P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
         double[] P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
-        double adb = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, intS, intE, extE, maxIt, tolB, mB, false);
+        double adb = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities.seq, P0, P1, intS, intE, extE, maxIt, tolB, mB, false);
         System.out.println("ADB logL = " + adb);
         assertEquals(adb, bd,  0.05);
     }

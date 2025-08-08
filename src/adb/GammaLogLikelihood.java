@@ -43,7 +43,7 @@ public class GammaLogLikelihood {
     /* Inputs
     a: scale (theta), b: shape (k), d: death probability, rho: sampling probability, origin: age of the tree
     intS: start times of internal branches, intE: end times of internal branches, extE: end times of external branches (backwards in time)
-    densities: pre-calculated (and FFT-transformed) pdf and cdf, together with underlying time array (0,origin) and step
+    tSeq: discretized time array underlying the probabilities
     P0: pre-calculated array with extinction probabilities
     P1: pre-calculated array with probabilities of single sampled descendants
     Options for calculating branch probabilities -
@@ -51,7 +51,7 @@ public class GammaLogLikelihood {
     approx: approximate B?
      */
     public static double calcLogLikelihood(double a, Number b, double d, double rho,
-                                           Densities densities, double[] P0, double[] P1,
+                                           double[] tSeq, double[] P0, double[] P1,
                                            double[] intS, double[] intE, double[] extE,
                                            int maxIt, double tol, int m, boolean approx) {
 
@@ -61,14 +61,13 @@ public class GammaLogLikelihood {
         }
 
         // extend P0 and P1 to calculate probabilities of tiny branches
-        double[] seq = densities.seq;
-        double[] extSeq = new double[seq.length + 1];
+        double[] extSeq = new double[tSeq.length + 1];
         double[] extP0 = new double[P0.length + 1];
         double[] extP1 = new double[P1.length + 1];
         extSeq[0] = 0;
         extP0[0] = 1 - rho;
         extP1[0] = rho;
-        System.arraycopy(seq, 0, extSeq, 1, seq.length);
+        System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
         System.arraycopy(P0, 0, extP0, 1, P0.length);
         System.arraycopy(P1, 0, extP1, 1, P1.length);
 
