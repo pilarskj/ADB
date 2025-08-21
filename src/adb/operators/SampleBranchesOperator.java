@@ -1,4 +1,4 @@
-package adbp.operators;
+package adb.operators;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
@@ -139,7 +139,7 @@ public class SampleBranchesOperator extends Operator {
                 }
                 n.setHeight(newHeight);
                 // based on manipulation, add a value to hastingsRatio
-                double toCheck = Math.log(newGammaDist.density(newBranchLength)) - Math.log(oldGammaDist.density(oldBranchLength)); // TODO or other way around?
+                double toCheck = Math.log(oldGammaDist.density(oldBranchLength)) - Math.log(newGammaDist.density(newBranchLength));
                 //double toCheck2 = (b-1) * (Math.log(oldBranchLength) - Math.log(newBranchLength)) + (newBranchLength-oldBranchLength)/a;
                 hastingsRatio += toCheck;
             }

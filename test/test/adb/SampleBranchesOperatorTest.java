@@ -1,6 +1,5 @@
 package test.adb;
 
-import adb.GammaBranchingModel;
 import adb.operators.SampleBranchesOperator;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;

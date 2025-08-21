@@ -47,7 +47,7 @@
  * Boston, MA  02110-1301  USA
  */
 
-package adbp.operators;
+package adb.operators;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
