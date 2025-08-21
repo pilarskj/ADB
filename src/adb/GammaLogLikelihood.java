@@ -1,4 +1,4 @@
-package adbp;
+package adb;
 
 import beast.base.core.Log;
 import org.apache.commons.math3.complex.Complex;
@@ -14,9 +14,10 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
+
 /*
 Class for solving the equations for P0, P1 and B
-and for calculating the likelihood of a tree based on the parameters and branching times
+and for calculating the probability of a tree based on its branching times given the ADB model parameters
  */
 public class GammaLogLikelihood {
 
@@ -24,32 +25,93 @@ public class GammaLogLikelihood {
     private static EuclideanDistance norm = new EuclideanDistance();
     private static LinearInterpolator interpolator = new LinearInterpolator();
 
+    // Nested class to hold densities
+    public static class Densities {
+        public Complex[] pdfFFT;
+        public double[] cdf;
+        public double[] seq;
+        public double dx;
+        public Densities(Complex[] pdfFFT, double[] cdf, double[] seq, double dx) {
+            this.pdfFFT = pdfFFT;
+            this.cdf = cdf;
+            this.seq = seq;
+            this.dx = dx;
+        }
+    }
 
     // Main function for calculating the likelihood of the tree
     /* Inputs
-    a: scale, b: shape, d: death probability, rho: sampling probability, origin: age of the tree
+    a: scale (theta), b: shape (k), d: death probability, rho: sampling probability, origin: age of the tree
     intS: start times of internal branches, intE: end times of internal branches, extE: end times of external branches (backwards in time)
-    Options for solving integral equations -
-    maxIt: maximum number of iterations, tolP: error tolerance for P0 and P1, tolB: error tolerance for branch probabilities (B),
-    mP: step size for P0 and P1, mB: step size for B, approx: approximate B?, useBD: use analytical solution for BD case (b=1)?
+    tSeq: discretized time array underlying the probabilities
+    P0: pre-calculated array with extinction probabilities
+    P1: pre-calculated array with probabilities of single sampled descendants
+    Options for calculating branch probabilities -
+    maxIt: maximum number of iterations, tol: error tolerance, m: step size (when solving integral equations with FFT),
+    approx: approximate B?
      */
-    public static double calcLogLikelihood(double a, Number b, double d, double rho, double origin,
+    public static double calcLogLikelihood(double a, Number b, double d, double rho,
+                                           double[] tSeq, double[] P0, double[] P1,
                                            double[] intS, double[] intE, double[] extE,
-                                           int maxIt, double tolP, double tolB, int mP, int mB, boolean approx, boolean useBD) {
+                                           int maxIt, double tol, int m, boolean approx) {
 
-        if (useBD) {
-            // use much simpler calculation for BD case
-            if (b.doubleValue() == 1 && d != 0.5) {
-                return calcBDLogLikelihood(a, d, rho, origin, intS, extE);
-            }
+        // check if extinction is certain
+        if (P0[P0.length - 1] == 1.0) {
+            return Double.NEGATIVE_INFINITY;
         }
+
+        // extend P0 and P1 to calculate probabilities of tiny branches
+        double[] extSeq = new double[tSeq.length + 1];
+        double[] extP0 = new double[P0.length + 1];
+        double[] extP1 = new double[P1.length + 1];
+        extSeq[0] = 0;
+        extP0[0] = 1 - rho;
+        extP1[0] = rho;
+        System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
+        System.arraycopy(P0, 0, extP0, 1, P0.length);
+        System.arraycopy(P1, 0, extP1, 1, P1.length);
+
+        // interpolate P1
+        UnivariateFunction function = interpolator.interpolate(extSeq, extP1);
+
+        // sum probabilities over external branches
+        double logP1 = 0;
+        for (int i = 0; i < extE.length; i++) {
+            logP1 += Math.log(function.value(extE[i])); // if probability at some tip < 0 due to rounding errors, this will be -Infinity
+        }
+        if (logP1 == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
+        // calculate probabilities of internal branches
+        double[] B;
+        if (approx) {
+            B = approxB(a, b.intValue(), d, intS, intE, extSeq, extP0, tol);
+        } else {
+            B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tol, m);
+        }
+
+        // sum over all internal branches
+        double logB = 0;
+        for (int i = 0; i < B.length; i++) {
+            logB += Math.log(B[i]); // if density for some branch < 0 due to rounding errors, this will be -Infinity
+        }
+        if (logB == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
+        // sum (with conditioning on survival)
+        return -Math.log(1 - P0[P0.length - 1]) + logP1 + logB;
+    }
+
+
+    // Function for calculating the transformed density functions
+    public static Densities getDensities(double a, Number b, double origin, int m) {
 
         // initialize distribution
         GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
 
         // generate linearly spaced values between 0 and origin
-        int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
-
         double[] tSeq = new double[m];
         final double dx = origin / m;
         for (int i = 0; i < m; i++) {
@@ -66,64 +128,7 @@ public class GammaLogLikelihood {
         }
         Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
 
-        // calculate extinction probability over time
-        final double[] P0 = calcP0(pdfFFT, cdf, d, rho, dx, maxIt, tolP);
-        /* // print error if P0 is not in range
-        double minP0 = Arrays.stream(P0).min().getAsDouble();
-        double maxP0 = Arrays.stream(P0).max().getAsDouble();
-        if (minP0 < 0 || maxP0 > 1) {
-            Log.debug.println("P0 not in range [0,1], min " + minP0 + " max " + maxP0);
-        } */
-
-        // avoid division by 0 due to rounding errors (when conditioning on survival)
-        if (P0[m - 1] == 1.0) {
-            return Double.NEGATIVE_INFINITY;
-        }
-
-        // calculate probability of single descendants at tips
-        final double[] P1 = calcP1(pdfFFT, cdf, P0, d, rho, extE, tSeq, dx, maxIt, tolP);
-        /* // print error if P1 is not in range
-        double minP1 = Arrays.stream(P1).min().getAsDouble();
-        double maxP1 = Arrays.stream(P1).max().getAsDouble();
-        if (minP1 < 0 || maxP1 > 1) {
-            Log.debug.println("P1 not in range [0,1] min " + minP1 + " max " + maxP1);
-        } */
-
-        // sum over external branches
-        double logP1 = 0;
-        for (int i = 0; i < P1.length; i++) {
-            logP1 += Math.log(P1[i]); // if probability at some tip < 0 due to rounding errors, this will be -Infinity
-        }
-        if (logP1 == Double.NEGATIVE_INFINITY) {
-            return Double.NEGATIVE_INFINITY;
-        }
-
-        // calculate probabilities of internal branches
-        double[] B;
-        if (approx) {
-            B = approxB(a, b.intValue(), d, intS, intE, tSeq, P0, tolB);
-        } else {
-            // extend arrays (to calculate probabilities of very short internal branches)
-            double[] extSeq = new double[tSeq.length + 1];
-            double[] extP0 = new double[P0.length + 1];
-            extSeq[0] = 0;
-            extP0[0] = 1 - rho;
-            System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
-            System.arraycopy(P0, 0, extP0, 1, P0.length);
-            B = calcB(a, b, d, intS, intE, extSeq, extP0, maxIt, tolB, mB);
-        }
-
-        // sum over all internal branches
-        double logB = 0;
-        for (int i = 0; i < B.length; i++) {
-            logB += Math.log(B[i]); // if density for some branch < 0 due to rounding errors, this will be -Infinity
-        }
-        if (logB == Double.NEGATIVE_INFINITY) {
-            return Double.NEGATIVE_INFINITY;
-        }
-
-        // sum (with conditioning on survival)
-        return -Math.log(1 - P0[m - 1]) + logP1 + logB;
+        return new Densities(pdfFFT, cdf, tSeq, dx);
     }
 
 
@@ -188,11 +193,10 @@ public class GammaLogLikelihood {
 
 
     // Function for calculating the probability of a single descendant
-    public static double[] calcP1(Complex[] pdfFFT, double[] cdf, double[] P0, double d, double rho,
-                                  double[] extT, double[] tSeq, double dx, int maxIt, double tol) {
+    public static double[] calcP1(Complex[] pdfFFT, double[] cdf, double[] P0, double d, double rho, double dx, int maxIt, double tol) {
 
         // get length
-        int n = tSeq.length;
+        int n = cdf.length;
 
         // initialize
         double[] X0 = new double[n];
@@ -235,22 +239,7 @@ public class GammaLogLikelihood {
             Log.debug.println("calcP1: max iterations reached with error:  " + err);
         }
 
-        // interpolate
-        // extend arrays (to calculate probabilities of very short external branches)
-        double[] extSeq = new double[tSeq.length + 1];
-        double[] extX = new double[X.length + 1];
-        extSeq[0] = 0;
-        extX[0] = rho;
-        System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
-        System.arraycopy(X, 0, extX, 1, X.length);
-
-        UnivariateFunction function = interpolator.interpolate(extSeq, extX);
-        double[] P1 = new double[extT.length];
-        for (int i = 0; i < extT.length; i++) {
-            P1[i] = function.value(extT[i]); // interpolate
-        }
-
-        return P1;
+        return X;
     }
 
 
@@ -375,10 +364,10 @@ public class GammaLogLikelihood {
                     double P0M = getMean(P0Slice);
 
                     // initialize the approximation
-                    int k = (int) ((ex - sx) / (a * b)); // for this k, the term b_k will be maximal --> WRONG! To correct! (in Nicola's Rcpp code: k = min_num_terms)
+                    int k = (int) ((ex - sx) / (a * b)); // around this k, the term b_k will be maximal
                     double branchProb = 0;
 
-                    int i = 0; // increase k (because k is not the maximal one, start with 0 and treat k as minimum number of terms)
+                    int i = 0; // increase (start with 0 and treat k as minimum number of terms)
                     double term = 1;
                     while (term > tol || i <= k) { // only stops when both term <= tol and i > k!
                         GammaDistribution gammaDist;
@@ -393,22 +382,6 @@ public class GammaLogLikelihood {
                         branchProb += term;
                         i++;
                     }
-
-                    /* int j = k - 1; // decrease k
-                    term = 1;
-                    while (term > tol & j >= 0) {
-                        GammaDistribution gammaDist;
-                        // check if GammaDistribution with the given shape is already in the cache
-                        if (gammaCache.containsKey(j + 1)) {
-                            gammaDist = gammaCache.get(j + 1);
-                        } else { // otherwise, add it
-                            gammaDist = new GammaDistribution((j + 1) * b, a);
-                            gammaCache.put(j + 1, gammaDist);
-                        }
-                        term = Math.pow(2, j) * Math.pow(1 - d, j + 1) * Math.pow(P0M, j) * Math.exp(gammaDist.logDensity(ex - sx)); // calculate b_j
-                        branchProb += term;
-                        j--;
-                    } */
 
                     B[x] = branchProb;
                 });
@@ -511,7 +484,7 @@ public class GammaLogLikelihood {
     }
 
 
-    // simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)
+    // Simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)
     public static double calcBDLogLikelihood(double a, double d, double rho, double origin,
                                              double[] intS, double[] extE) {
 
@@ -525,7 +498,7 @@ public class GammaLogLikelihood {
         t[t.length - 1] = origin;
 
         // get branch probabilities (no sampling through time)
-        double c1 = lambda - mu;
+        double c1 = Math.abs(lambda - mu);
         double c2 = -(lambda - mu - 2 * lambda * rho) / c1;
         double[] B = new double[t.length];
         IntStream.range(0, t.length)

@@ -1,12 +1,10 @@
+package test.adb;
 
-package test.adbp;
-
-import adbp.GammaBranchingModel;
+import adb.GammaBranchingModel;
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
 import bdsky.evolution.speciation.BirthDeathSkylineModel;
 import beast.base.evolution.tree.Tree;
-import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 import feast.fileio.TreeFromNewickFile;
@@ -17,9 +15,11 @@ import java.text.DecimalFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-// compare estimates between ADBP, BDSKY and BDMM-Prime for shape = 1 (BD case)
+
+// Comparison of likelihood calculation in ADB, BDSKY and BDMM-Prime for tree with shape = 1 (BD case)
 public class BDTest {
 
+    // compare on an example tree
     @Test
     public void testBDSKY() throws Exception {
         // initialize
@@ -27,7 +27,7 @@ public class BDTest {
 
         // get tree with 100 tips
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "examples/tree_bd.newick",
+        tree.initByName("fileName", "test_data/treeBD.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -38,24 +38,24 @@ public class BDTest {
         model.setInputValue("deathRate", new RealParameter("0.02"));
         model.setInputValue("samplingRate", new RealParameter("0"));
         model.setInputValue("rho", new RealParameter("0.1"));
-        model.setInputValue("origin", new RealParameter("50"));
-        model.setInputValue("contemp", "true");
-        model.setInputValue("conditionOnSurvival", "true");
+        // model.setInputValue("origin", new RealParameter("50"));
+        model.setInputValue("contemp", true);
+        model.setInputValue("conditionOnSurvival", true);
+        model.setInputValue("conditionOnRoot", true);
 
         model.initAndValidate();
 
         // calculate tree LL
         double logL = model.calculateTreeLogLikelihood(tree);
-        System.out.println(logL); // -348.3790 value matches with ADBP without tree factor (has been discarded)
+        System.out.println(logL); // -348.3790 value matches with ADB without tree factor (has been discarded); value with conditioning on the root also matches
     }
-
 
     @Test
     public void testBDMM() throws Exception {
 
         // get tree with 150 tips
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "examples/tree_bd.newick",
+        tree.initByName("fileName", "test_data/treeBD.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -89,12 +89,12 @@ public class BDTest {
                 "tree", tree,
                 "typeLabel", "type",
                 "parallelize", false,
+                // "conditionOnRoot", true,
                 "useAnalyticalSingleTypeSolution", true);
 
         double logL = density.calculateLogP();
-        System.out.println(logL); // -643.4968 value matches with ADB
+        System.out.println(logL); // -643.4968 value matches with ADB (slight difference when conditioning on the root - other definition?)
     }
-
 
     @Test
     public void testADB() throws Exception {
@@ -104,10 +104,9 @@ public class BDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "examples/tree_bd.newick",
+        tree.initByName("fileName", "test_data/treeBD.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
-
         model.setInputValue("tree", tree);
 
         // set parameters
@@ -116,52 +115,58 @@ public class BDTest {
         model.setInputValue("deathprob", new RealParameter("0.1"));
         model.setInputValue("rho", new RealParameter("0.1"));
         model.setInputValue("origin", new RealParameter("50"));
-        model.setInputValue("approx", "approx");
+        // model.setInputValue("conditionOnRoot", true);
+        model.setInputValue("approx", true);
 
         model.initAndValidate();
 
         // calculate tree LL
-        model.setInputValue("useAnalyticalBDSolution", "true");
+        model.setInputValue("useAnalyticalBDSolution", true);
         double bd = model.calculateTreeLogLikelihood(tree);
         System.out.println("BD logL = " + bd); // -643.4968
 
-        model.setInputValue("useAnalyticalBDSolution", "false");
+        model.setInputValue("useAnalyticalBDSolution", false);
         double adb = model.calculateTreeLogLikelihood(tree);
         System.out.println("ADB logL = " + adb); // -643.8421
 
-        assertEquals(adb, bd, 0.5);
+        assertEquals(adb, bd, tree.getLeafNodeCount() * 0.05);
     }
 
 
-    // TO REMOVE (function for comparing likelihood curves)
+    // compare log-likelihood curves for the tree and assert close match between implementations
+    // see https://github.com/pilarskj/ADB-analysis/accuracy_evaluation
     @Test
     public void testBDMMSeq() throws Exception {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/tree_bd_low_sampling.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/treeBD.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
+        // fix all but one parameter
         double C = 5; // lifetime
-        //double d = 0.1; // death probability
-        double rho = 0.001; // sampling probability
+        double d = 0.1; // death probability
+        // double rho = 0.1; // sampling probability
+        double origin = 50;
+
         // loop over different parameter values
-        double start = 0;
-        double end = 0.5;
+        double start = 0.01;
+        double end = 1;
         double step = 0.02;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/validation/calculations/loglik_bd_low_sampling.csv", true);
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/loglikTreeBD.csv", true);
         DecimalFormat df = new DecimalFormat("0.00");
         for (double i = start; i <= end; i += step) {
-            double d = i;
+
+            // calculate birth and death rate
+            double rho = i;
             double lambda = (1 - d) / C;
             double mu = d / C;
 
-            // initialize
             Parameterization parameterization = new CanonicalParameterization();
             parameterization.initByName(
                     "typeSet", new TypeSet(1),
-                    "processLength", new RealParameter("100"),
+                    "processLength", new RealParameter(Double.toString(origin)),
                     "birthRate", new SkylineVectorParameter(
                             null,
                             new RealParameter(Double.toString(lambda))),
@@ -174,7 +179,7 @@ public class BDTest {
                             null,
                             new RealParameter("0")),
                     "rhoSampling", new TimedParameter(
-                            new RealParameter("100"),
+                            new RealParameter(Double.toString(origin)),
                             new RealParameter(Double.toString(rho))),
                     "removalProb", new SkylineVectorParameter(
                             null,
@@ -190,7 +195,52 @@ public class BDTest {
                     "useAnalyticalSingleTypeSolution", true);
 
             double logL = density.calculateLogP();
-            writer.write("d," + df.format(i) + "," + logL + ",bdmm\n");
+            writer.write("rho," + df.format(i) + "," + logL + ",bdmm\n"); // adapt strings
+        }
+        writer.close();
+    }
+
+
+    @Test
+    public void testADBSeq() throws Exception {
+
+        // get tree
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/treeBD.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        // either approx or exact calculations
+        boolean approx = true;
+
+        // fix all but one parameter
+        double C = 5; // lifetime
+        double d = 0.1; // death probability
+        // double rho = 0.1; // sampling probability
+        double origin = 50;
+
+        // loop over different parameter values
+        double start = 0.01;
+        double end = 1;
+        double step = 0.02;
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/ADB-analysis/accuracy_evaluation/loglikTreeBD.csv", true);
+        DecimalFormat df = new DecimalFormat("0.00");
+        for (double i = start; i <= end; i += step) {
+            double rho = i;
+
+            GammaBranchingModel model = new GammaBranchingModel();
+            model.initByName(
+                    "tree", tree,
+                    "shapeInteger", new IntegerParameter("1"),
+                    "lifetime", new RealParameter(Double.toString(C)),
+                    "deathprob", new RealParameter(Double.toString(d)),
+                    "rho", new RealParameter(Double.toString(rho)),
+                    "origin", new RealParameter(Double.toString(origin)),
+                    "approx", approx,
+                    "useAnalyticalBDSolution", false);
+
+            double logL = model.calculateTreeLogLikelihood(tree);
+            writer.write("rho," + df.format(i) + "," + logL + ",adb_approx\n"); // adapt strings
         }
         writer.close();
     }

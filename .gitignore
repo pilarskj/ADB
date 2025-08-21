@@ -5,10 +5,6 @@ out/
 src/META-INF/
 .idea/
 *.iml
-*.log
-*.state
-examples/*.csv
-examples/*.txt
 
 ### Eclipse ###
 .apt_generated
@@ -34,3 +30,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Other ###
+*.out
+*.log
+*.state

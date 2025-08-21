@@ -1,7 +1,7 @@
-package test.adbp;
+package test.adb;
 
-import adbp.GammaBranchingModel;
-import adbp.operators.SampleBranchesOperator;
+import adb.GammaBranchingModel;
+import adb.operators.SampleBranchesOperator;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
@@ -12,7 +12,6 @@ import org.apache.commons.math3.distribution.GammaDistribution;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public class SampleBranchesOperatorTest {
@@ -91,7 +90,7 @@ public class SampleBranchesOperatorTest {
         SampleBranchesOperator op = new SampleBranchesOperator();
         op.setInputValue("tree", tree);
         op.setInputValue("lifetime", new RealParameter("5"));
-        op.setInputValue("shape", new IntegerParameter("10"));
+        op.setInputValue("shapeInteger", new IntegerParameter("10"));
         op.setInputValue("origin", new RealParameter("20"));
 
         double hr = op.proposal();
