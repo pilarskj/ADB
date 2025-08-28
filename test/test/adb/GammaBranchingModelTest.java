@@ -64,7 +64,7 @@ public class GammaBranchingModelTest {
         Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
         /* // alternatively, read a tree from .newick file
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "test_data/example.newick", "IsLabelledNewick", true, "adjustTipHeights", true); */
+        tree.initByName("fileName", "test_data/treeBD.newick", "IsLabelledNewick", true, "adjustTipHeights", true); */
         model.setInputValue("tree", tree);
 
         // set parameters

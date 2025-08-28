@@ -53,7 +53,7 @@ public class BDTest {
     @Test
     public void testBDMM() throws Exception {
 
-        // get tree with 150 tips
+        // get tree with 100 tips
         Tree tree = new TreeFromNewickFile();
         tree.initByName("fileName", "test_data/treeBD.newick",
                 "IsLabelledNewick", true,
