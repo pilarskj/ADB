@@ -392,7 +392,7 @@ public class GammaLogLikelihood {
 
 
     // Function for partial convolution using FFT
-    private static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+    protected static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
 
         // perform FFT on padded y
         Complex[] fy = fft.transform(padZeros(y), TransformType.FORWARD);
@@ -417,7 +417,7 @@ public class GammaLogLikelihood {
 
 
     // Helper method to pad an array with 0 to its double length
-    private static double[] padZeros(double[] x) {
+    protected static double[] padZeros(double[] x) {
         int n = x.length;
         double[] xp = new double[n * 2];
         System.arraycopy(x, 0, xp, 0, n);
