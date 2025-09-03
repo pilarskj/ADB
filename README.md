@@ -2,7 +2,7 @@
 
 This repository provides a [BEAST 2](http://www.beast2.org) package for performing phylodynamic inference under the Age-Dependent Branching process.
 
-The preprint describing the phylodynamic model and its applications can be found here \[add link\].
+The [preprint](https://doi.org/10.1101/2025.08.28.672870) describing the phylodynamic model and its applications is available on bioRxiv.
 
 ## The process
 
