@@ -150,7 +150,7 @@ public class MTLogLikelihood {
             // recursion
             double subtreeL = 0;
             // loop over all possible types at internal nodes
-            for (int j = 0;  j < ntypes; j++){
+            for (int j = 0; j < ntypes; j++){
 
                 // get subtree (new stems)
                 int right_stem = right_child[stem_index];
@@ -177,15 +177,16 @@ public class MTLogLikelihood {
     public static double[][] calcMTP0(Complex[][] pdfFFT, double[][] cdf, double[] d, double rho, double[][] Xsi_as, double[][] Xsi_s,
                                       double[] t, double dx, int maxIt, double tol) {
 
+        // notation: i = iteration, w = integration variable (time), j and k = types
         // get number of types and time steps
-        int n = cdf[0].length;
+        int ntypes = cdf[0].length;
         int m = t.length;
 
         // initialize matrix
-        double[][] X0 = new double[m][n];
-        for (int i = 0; i < m; i++) {
-            for (int x = 0; x < n; x++) {
-                X0[i][x] = (1 - rho) * (1 - cdf[i][x]) + d[x] * cdf[i][x];
+        double[][] X0 = new double[m][ntypes];
+        for (int w = 0; w < m; w++) {
+            for (int j = 0; j < ntypes; j++) {
+                X0[w][j] = (1 - rho) * (1 - cdf[w][j]) + d[j] * cdf[w][j];
             }
         }
 
@@ -196,28 +197,28 @@ public class MTLogLikelihood {
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][] Xi = new double[m][n];
+            double[][] Xi = new double[m][ntypes];
 
-            for (int j = 0; j < n; j++) {
+            for (int j = 0; j < ntypes; j++) {
                 // get vectors for convolution
                 double[] y = new double[m];
-                for (int i = 0; i < m; i++) { // multiply elementwise on times
-                    for (int k = 0; k < n; k++) { // sum over all types k
-                        y[i] += 2 * Xsi_as[j][k] * X[i][j] * X[i][k] + Xsi_s[j][k] * X[i][k] * X[i][k];
+                for (int w = 0; w < m; w++) { // multiply elementwise on times
+                    for (int k = 0; k < ntypes; k++) { // sum over all types k
+                        y[w] += Xsi_s[j][k] * X[w][k] * X[w][k] + 2 * Xsi_as[j][k] * X[w][j] * X[w][k];
                     }
                 }
                 // extract column from the pdf matrix
                 Complex[] Ft = new Complex[m*2];
-                for (int i = 0; i < m*2; i++) {
-                    Ft[i] = pdfFFT[i][j];
+                for (int w = 0; w < m*2; w++) {
+                    Ft[w] = pdfFFT[w][j];
                 }
 
                 // partially convolve
                 double[] I = convolveFFT(Ft, y, m, dx);
 
                 // sum
-                for (int i = 0; i < m; i++) {
-                    Xi[i][j] = X0[i][j] + (1 - d[j]) * I[i];
+                for (int w = 0; w < m; w++) {
+                    Xi[w][j] = X0[w][j] + (1 - d[j]) * I[w];
                 }
             };
 
@@ -242,14 +243,14 @@ public class MTLogLikelihood {
                                       double[] extT, double[] t0, double[][] P0, double dx, int maxIt, double tol) {
 
         // get number of types and time steps
-        int n = cdf[0].length;
+        int ntypes = cdf[0].length;
         int m = t0.length;
 
         // initialize matrix
-        double[][] X0 = new double[m][n];
-        for (int i = 0; i < m; i++) {
-            for (int x = 0; x < n; x++) {
-                X0[i][x] = rho * (1 - cdf[i][x]);
+        double[][] X0 = new double[m][ntypes];
+        for (int w = 0; w < m; w++) {
+            for (int j = 0; j < ntypes; j++) {
+                X0[w][j] = rho * (1 - cdf[w][j]);
             }
         }
 
@@ -260,29 +261,29 @@ public class MTLogLikelihood {
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][] Xi = new double[m][n];
+            double[][] Xi = new double[m][ntypes];
 
-            for (int j = 0; j < n; j++) {
+            for (int j = 0; j < ntypes; j++) {
                 // get vectors for convolution
                 double[] y = new double[m];
-                for (int i = 0; i < m; i++) { // multiply elementwise on times
-                    for (int k = 0; k < n; k++) { // sum over all types k
-                        y[i] += 2 * Xsi_as[j][k] * (X[i][j] * P0[i][k] + X[i][k] * P0[i][j])
-                                + Xsi_s[j][k] * X[i][k] * P0[i][k];
+                for (int w = 0; w < m; w++) { // multiply elementwise on times
+                    for (int k = 0; k < ntypes; k++) { // sum over all types k
+                        y[w] += Xsi_s[j][k] * P0[w][k] * X[w][k] +
+                                Xsi_as[j][k] * (P0[w][j] * X[w][k] + X[w][j] * P0[w][k]);
                     }
                 }
                 // extract column from the pdf matrix
                 Complex[] Ft = new Complex[m*2];
-                for (int i = 0; i < m*2; i++) {
-                    Ft[i] = pdfFFT[i][j];
+                for (int w = 0; w < m*2; w++) {
+                    Ft[w] = pdfFFT[w][j];
                 }
 
                 // partially convolve
                 double[] I = convolveFFT(Ft, y, m, dx);
 
                 // sum
-                for (int i = 0; i < m; i++) {
-                    Xi[i][j] = X0[i][j] + 2 * (1 - d[j]) * I[i];
+                for (int w = 0; w < m; w++) {
+                    Xi[w][j] = X0[w][j] + 2 * (1 - d[j]) * I[w];
                 }
             }
 
@@ -300,18 +301,18 @@ public class MTLogLikelihood {
 
         // interpolate: evaluate at tip times
         int ntips = extT.length;
-        double[][] P1 = new double[ntips][n];
+        double[][] P1 = new double[ntips][ntypes];
 
-        for (int j = 0; j < n; j++) {
+        for (int j = 0; j < ntypes; j++) {
             // extract column from X
             double[] Xj = new double[m];
-            for (int i = 0; i < m; i++) {
-                Xj[i] = X[i][j];
+            for (int w = 0; w < m; w++) {
+                Xj[w] = X[w][j];
             }
             UnivariateFunction function = interpolator.interpolate(t0, Xj);
 
-            for (int i = 0; i < ntips; i++) {
-                P1[i][j] = function.value(extT[i]);
+            for (int x = 0; x < ntips; x++) {
+                P1[x][j] = function.value(extT[x]);
             }
         }
 
@@ -336,8 +337,8 @@ public class MTLogLikelihood {
                 .forEach(j -> {
                     // extract column from P0
                     double[] P0j = new double[t0.length];
-                    for (int i = 0; i < t0.length; i++) {
-                        P0j[i] = P0[i][j];
+                    for (int w = 0; w < t0.length; w++) {
+                        P0j[w] = P0[w][j];
                     }
                     UnivariateFunction function = interpolator.interpolate(t0, P0j);
                     functions.add(function);
@@ -356,9 +357,9 @@ public class MTLogLikelihood {
                     double[] tSeq = new double[m];
                     double[] age_seq = new double[m];
                     double dx = (ex - sx) / m;
-                    for (int i = 0; i < m; i++) {
-                        tSeq[i] = sx + dx * (i + 1);
-                        age_seq[i] = tSeq[i] - sx;
+                    for (int w = 0; w < m; w++) {
+                        tSeq[w] = sx + dx * (w + 1);
+                        age_seq[w] = tSeq[w] - sx;
                     }
                     assert tSeq[m - 1] == ex;
 
@@ -370,16 +371,16 @@ public class MTLogLikelihood {
                     for (int j = 0; j < ntypes; j++) {
                         double[] pdf = new double[m];
                         GammaDistribution gammaDist = new GammaDistribution(b[j], a[j]);
-                        for (int i = 0; i < m; i++) {
-                            pdf[i] = gammaDist.density(age_seq[i]); // get density
-                            P[i][j] = functions.get(j).value(tSeq[i]); // interpolate P0
-                            X0[i][j] = (1 - d[j]) * pdf[i]; // initalize matrix
+                        for (int w = 0; w < m; w++) {
+                            pdf[w] = gammaDist.density(age_seq[w]); // get density
+                            P[w][j] = functions.get(j).value(tSeq[w]); // interpolate P0
+                            X0[w][j] = (1 - d[j]) * pdf[w]; // initalize matrix
                         }
 
                         // perform FFT
                         Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
-                        for (int i = 0; i < m*2; i++) {
-                            pdfFFT[i][j] = Ft[i];
+                        for (int w = 0; w < m*2; w++) {
+                            pdfFFT[w][j] = Ft[w];
                         }
                     }
 
@@ -397,24 +398,24 @@ public class MTLogLikelihood {
                             // get vectors for convolution
                             double[] y = new double[m];
                             for (int k = 0; k < ntypes; k++) { // sum over all types k
-                                for (int i = 0; i < m; i++) { // multiply elementwise on times
-                                    y[i] += Xsi_as[j][k] * (X[i][j] * P[i][k] + P[i][j] * X[i][k]) +
-                                            Xsi_s[j][k] * X[i][k] * P[i][k];
+                                for (int w = 0; w < m; w++) { // multiply elementwise on times
+                                    y[w] += Xsi_s[j][k] * P[w][k] * X[w][k] +
+                                            Xsi_as[j][k] * (P[w][j] * X[w][k] + X[w][j] * P[w][k]);
                                 }
                             }
 
                             // extract column from the pdf matrix
                             Complex[] Ft = new Complex[m * 2];
-                            for (int i = 0; i < m * 2; i++) {
-                                Ft[i] = pdfFFT[i][j];
+                            for (int w = 0; w < m * 2; w++) {
+                                Ft[w] = pdfFFT[w][j];
                             }
 
                             // partially convolve
                             double[] I = convolveFFT(Ft, y, m, dx);
 
                             // sum
-                            for (int i = 0; i < m; i++) {
-                                Xi[i][j] = X0[i][j] + 2 * (1 - d[j]) * I[i];
+                            for (int w = 0; w < m; w++) {
+                                Xi[w][j] = X0[w][j] + 2 * (1 - d[j]) * I[w];
                             }
                         }
 

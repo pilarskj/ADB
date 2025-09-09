@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.Random;
 
 /*
 Class for storing branches of a phylogenetic tree in a list.
@@ -17,15 +16,15 @@ Keeps track of start and end time, left and right child, and type of each branch
 public class BranchList {
     private List<Branch> branches;
 
-    public BranchList(TreeInterface tree, double origin, boolean typed) {
+    public BranchList(TreeInterface tree, double originTime, int originType) {
         branches = new ArrayList<>();
-        traverseTree(tree, origin, typed);
+        traverseTree(tree, originTime, originType);
         assignBranchIndices();
         findChildBranches();
     }
 
     // BFS traversal method to add branches to the list
-    private void traverseTree(TreeInterface tree, double origin, boolean typed) {
+    private void traverseTree(TreeInterface tree, double originTime, int originType) {
         Node root = tree.getRoot();
         if (root == null) {
             return;
@@ -38,27 +37,29 @@ public class BranchList {
             Node node = queue.poll(); // dequeue current node
             Node parent = node.getParent();
 
-            // extract node type
-            int nodeType;
-            if (typed) {
-                Double nodeTypeDouble = (Double) node.getMetaData("type");
-                nodeType = nodeTypeDouble.intValue();
-            } else {
-                nodeType = -1;
-            }
-
             // get start and end time
             int startNode = node.getNr();
             double startTime = node.getHeight();
-
             int endNode;
             double endTime;
             if (parent == null) {
                 endNode = startNode + 1;
-                endTime = origin;
+                endTime = originTime;
             } else {
                 endNode = parent.getNr();
                 endTime = parent.getHeight();
+            }
+
+            // get start and end type
+            int startType;
+            int endType;
+            Object nodeType = node.getMetaData("type");
+            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = -1; }
+            if (parent == null) {
+                endType = originType;
+            } else {
+                Object parentType = parent.getMetaData("type");
+                if (parentType != null) { endType = ((Double) parentType).intValue(); } else { endType = -1; }
             }
 
             // get mode
@@ -69,7 +70,7 @@ public class BranchList {
                 branchMode = "internal";
             }
 
-            branches.add(new Branch(startNode, endNode, startTime, endTime, branchMode, nodeType)); // add branch to list
+            branches.add(new Branch(startNode, endNode, startTime, endTime, startType, endType, branchMode)); // add branch to list
 
             if (node.getLeft() != null) {
                 queue.add(node.getLeft()); // enqueue left child
@@ -150,14 +151,5 @@ public class BranchList {
         return i;
     }
 
-    // Assign random types (for testing)
-    public void assignRandomTypes(int ntypes) {
-        Random random = new Random();
-        random.setSeed(12345);
-        for (Branch branch : branches) {
-            int randomType = random.nextInt(ntypes);
-            branch.nodeType = randomType;
-        }
-    }
 }
 
