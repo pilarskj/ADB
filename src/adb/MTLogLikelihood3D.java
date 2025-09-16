@@ -16,6 +16,7 @@ import static adb.GammaLogLikelihood.convolveFFT;
 import static adb.GammaLogLikelihood.padZeros;
 import static adb.MTLogLikelihood.calcMTB;
 import static adb.MTLogLikelihood.calcMTP0;
+import static org.apache.commons.math3.special.Gamma.logGamma;
 
 /*
 Class for solving the equations for P0, P1 and B in the multi-type case
@@ -74,13 +75,27 @@ public class MTLogLikelihood3D {
         // calculate extinction probability over time
         double[][] P0 = calcMTP0(pdfFFT, cdf, d, rho, Xsi_as, Xsi_s, tSeq, dx, maxIt, tolP);
 
-        // calculate probability of single descendant over time
-        double[][][] P1 = calcMTP13D(pdfFFT, cdf, d, rho, Xsi_as, Xsi_s, tSeq, P0, dx, maxIt, tolP);
+        // stop if extinction is certain
+        if (P0[P0.length - 1][type_or] == 1.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
 
         // extend tSeq to calculate probabilities of tiny branches
         double[] extSeq = new double[tSeq.length + 1];
         extSeq[0] = 0;
         System.arraycopy(tSeq, 0, extSeq, 1, tSeq.length);
+
+        // extend P0
+        double[][] extP0 = new double[m + 1][ntypes];
+        for (int i = 0; i < ntypes; i++) {
+            extP0[0][i] = 1 - rho;
+            for (int w = 0; w < m ; w++) {
+                extP0[w + 1][i] = P0[w][i];
+            }
+        }
+
+        // calculate probability of single descendant over time
+        double[][][] P1 = calcMTP13D(pdfFFT, cdf, d, rho, Xsi_as, Xsi_s, tSeq, P0, dx, maxIt, tolP);
 
         // interpolate P1
         HashMap<Pair<Integer,Integer>, UnivariateFunction> P1Map = new HashMap<>();
@@ -131,25 +146,39 @@ public class MTLogLikelihood3D {
         return logP1; */
 
         // calculate probabilities of internal branches
-        double[][] B = calcMTB(a, b, d, Xsi_as, Xsi_s, intS, intE, tSeq, P0, maxIt, tolB, mB);
+        double[][] B = calcMTB(a, b, d, Xsi_as, Xsi_s, intS, intE, extSeq, extP0, maxIt, tolB, mB);
+
+        // store subtree-likelihoods (dynamic programming)
+        Double[][] subtreeLik = new Double[n_int + n_ext][ntypes];
 
         // start recursion
         double treeL = calcLikelihoodTipTyped(1, branches, n_ext, ntypes, 0, type_or,
-                left_child, right_child, Xsi_as, Xsi_s, P1Map, B);
+                left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik);
 
-        return Math.log(treeL);
+        // add tree factor
+        double treeFactor = (n_ext - 1) * Math.log(2) - logGamma(n_ext + 1); // 2^(n-1)/n!
+
+        return treeFactor - Math.log(1 - P0[P0.length - 1][type_or]) + Math.log(treeL);
     }
 
     // Recursive function for calculating the tree likelihood (for tip-typed tree)
     public static double calcLikelihoodTipTyped(double likelihood, BranchList branches, int ntips, int ntypes,
                                                 int stem_index, int stem_type, int[] left_child, int[] right_child,
                                                 double[][] Xsi_as, double[][] Xsi_s,
-                                                HashMap<Pair<Integer,Integer>, UnivariateFunction> P1Map, double[][] B) {
+                                                HashMap<Pair<Integer,Integer>, UnivariateFunction> P1Map, double[][] B,
+                                                Double[][] subtreeLik) {
+
+        // check if calculation is stored already
+        if (subtreeLik[stem_index][stem_type] != null) {
+            return subtreeLik[stem_index][stem_type];
+        }
+
+        double result;
 
         // at tips
         if (stem_index >= ntips - 1) {
             Branch branch = branches.getBranchByIndex(stem_index);
-            return P1Map.get(new Pair<>(stem_type, branch.startType)).value(branch.endTime);
+            result = P1Map.get(new Pair<>(stem_type, branch.startType)).value(branch.endTime);
 
         } else {
             // recursion
@@ -162,19 +191,20 @@ public class MTLogLikelihood3D {
                 int left_stem = left_child[stem_index];
 
                 subtreeL += Xsi_s[stem_type][j] *
-                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B) *
-                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B) +
+                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik) *
+                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik) +
                         Xsi_as[stem_type][j] *
-                                (calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B) *
-                                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1Map, B) +
-                                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1Map, B) *
-                                                calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B));
+                                (calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik) *
+                                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik) +
+                                        calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, left_stem, stem_type, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik) *
+                                                calcLikelihoodTipTyped(likelihood, branches, ntips, ntypes, right_stem, j, left_child, right_child, Xsi_as, Xsi_s, P1Map, B, subtreeLik));
                         ;
             }
 
-            likelihood = B[stem_index][stem_type] * subtreeL;
-            return likelihood;
+            result = B[stem_index][stem_type] * subtreeL;
         }
+        subtreeLik[stem_index][stem_type] = result;
+        return result;
     }
 
 
