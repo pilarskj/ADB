@@ -3,10 +3,7 @@ package adb;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 
 /*
 Class for storing branches of a phylogenetic tree in a list.
@@ -20,6 +17,7 @@ public class BranchList {
         branches = new ArrayList<>();
         traverseTree(tree, originTime, originType);
         assignBranchIndices();
+        branches.sort(Comparator.comparingInt(b -> b.branchIndex)); // sort by index
         findChildBranches();
     }
 
@@ -54,12 +52,12 @@ public class BranchList {
             int startType;
             int endType;
             Object nodeType = node.getMetaData("type");
-            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = -1; }
+            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = 0; } // or -1
             if (parent == null) {
                 endType = originType;
             } else {
                 Object parentType = parent.getMetaData("type");
-                if (parentType != null) { endType = ((Double) parentType).intValue(); } else { endType = -1; }
+                if (parentType != null) { endType = ((Double) parentType).intValue(); } else { endType = 0; } // or -1
             }
 
             // get mode
@@ -120,13 +118,23 @@ public class BranchList {
     }
 
     // Get branch with a specific branchIndex
-    public  Branch getBranchByIndex(int i) {
+    public Branch getBranchByIndex(int i) {
         for (Branch branch : branches) {
             if (branch.branchIndex == i) {
                 return branch;
             }
         }
         throw new IllegalArgumentException("Branch not found for index: " + i);
+    }
+
+    // Find branch corresponding to a specific node
+    public Branch findBranchForNode(int nodeNr) {
+        for (Branch branch : branches) {
+            if (branch.startNode == nodeNr) {
+                return branch;
+            }
+        }
+        throw new IllegalArgumentException("Branch not found for node: " + nodeNr);
     }
 
     // Get the number of external branches

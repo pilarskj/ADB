@@ -13,7 +13,7 @@ import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import static adb.MTLogLikelihood3D.calcMTLogLikelihood3D;
+import static adb.MTLogLikelihood.calcMTLogLikelihood;
 
 public class MTBDTest {
 
@@ -26,14 +26,14 @@ public class MTBDTest {
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
-        double t_or = 20;
+        double t_or = 20; // 10
         int type_or = 0;
         double[] a = {2, 5};
         double[] b = {1, 1};
         double[] d = {0.1, 0.2};
         double rho = 1;
-        double[][] Xsi_as = {{0, 0.4}, {0.2, 0}};
         double[][] Xsi_s = {{0.2, 0}, {0, 0.6}};
+        double[][] Xsi_as = {{0, 0.8}, {0.4, 0}};
 
         // options
         int maxIt = 100;
@@ -49,10 +49,62 @@ public class MTBDTest {
         int n_ext = branches.countExternalBranches();
         System.out.println(n_int + " internal and " + n_ext + " external branches");
 
-        double logL = calcMTLogLikelihood3D(a, b, d, rho, Xsi_as, Xsi_s, t_or, type_or, branches,
+        double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
                 maxIt, tolP, tolB, mP, mB);
 
         System.out.println(logL);
+    }
+
+
+    @Test
+    public void testMTADBBug() throws Exception {
+
+        // simulated tree (typed)
+        Tree tree = new TreeFromNewickFile();
+        tree.initByName("fileName", "test_data/treeBD.newick",
+                "IsLabelledNewick", true,
+                "adjustTipHeights", true);
+
+        double t_or = 50;
+        int type_or = 0;
+        double[] a = {5};
+        double[] b = {1};
+        double[] d = {0.1};
+        double rho = 0.1;
+        double[][] Xsi_s = {{1}};
+        double[][] Xsi_as = {{0}};
+
+        // options
+        int maxIt = 100;
+        double tolP = 1e-12;
+        double tolB = 1e-6;
+        int mP = (int)Math.pow(2, 14);
+        int mB = (int)Math.pow(2, 12);
+
+        // get branches
+        BranchList branches = new BranchList(tree, t_or, type_or);
+
+        double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
+                maxIt, tolP, tolB, mP, mB);
+
+        System.out.println(logL);
+
+        /*// loop over different parameter values
+        double start = 1;
+        double end = 20;
+        double step = 0.5;
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/loglik_tree_bd.csv", true);
+        DecimalFormat df = new DecimalFormat("0.0");
+        for (double x = start; x <= end; x += step) {
+
+            // change theta1
+            a[0] = x;
+
+            double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
+                    maxIt, tolP, tolB, mP, mB);
+            writer.write("lifetime," + df.format(x) + "," + logL + ",mtadb\n"); // adapt strings
+        }
+        writer.close(); */
     }
 
 
@@ -115,19 +167,19 @@ public class MTBDTest {
         double[] a = {2, 5};
         double[] d = {0.1, 0.2};
         double rho = 1;
-        double[][] Xsi_as = {{0, 0.4}, {0.2, 0}};
         double[][] Xsi_s = {{0.2, 0}, {0, 0.6}};
+        double[][] Xsi_as = {{0, 0.8}, {0.4, 0}};
 
         // loop over different parameter values
         double start = 0.5;
-        double end = 20;
+        double end = 10;
         double step = 0.5;
         FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/loglik_tree_bdmm.csv", false);
         DecimalFormat df = new DecimalFormat("0.0");
         for (double x = start; x <= end; x += step) {
 
             // change theta1
-            a[1] = x;
+            a[0] = x;
 
             // calculate BDMM parameters
             double[] h = new double[ntypes];
@@ -136,7 +188,7 @@ public class MTBDTest {
             for (int i = 0; i < ntypes; i++) {
                 for (int j = 0; j < ntypes; j++) {
                     if (i == j) { Xsi[i][j] = Xsi_s[i][j]; }
-                    else { Xsi[i][j] = 2 * Xsi_as[i][j]; }
+                    else { Xsi[i][j] = Xsi_as[i][j]; }
                 }
             }
             double[] birthRate = new double[ntypes];
@@ -188,7 +240,7 @@ public class MTBDTest {
                     "parallelize", false);
 
             double logL = density.calculateLogP();
-            writer.write("lifetime1," + df.format(x) + "," + logL + ",bdmm\n"); // adapt strings
+            writer.write("lifetime0," + df.format(x) + "," + logL + ",bdmm\n"); // adapt strings
         }
         writer.close();
     }
@@ -211,8 +263,8 @@ public class MTBDTest {
         double[] b = {1, 1};
         double[] d = {0.1, 0.2};
         double rho = 1;
-        double[][] Xsi_as = {{0, 0.4}, {0.2, 0}};
         double[][] Xsi_s = {{0.2, 0}, {0, 0.6}};
+        double[][] Xsi_as = {{0, 0.4}, {0.2, 0}};
 
         // options
         int maxIt = 100;
@@ -226,18 +278,18 @@ public class MTBDTest {
 
         // loop over different parameter values
         double start = 0.5;
-        double end = 20;
+        double end = 10;
         double step = 0.5;
         FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/loglik_tree_bdmm.csv", true);
         DecimalFormat df = new DecimalFormat("0.0");
         for (double x = start; x <= end; x += step) {
 
             // change theta1
-            a[1] = x;
+            a[0] = x;
 
-            double logL = calcMTLogLikelihood3D(a, b, d, rho, Xsi_as, Xsi_s, t_or, type_or, branches,
+            double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
                     maxIt, tolP, tolB, mP, mB);
-            writer.write("lifetime1," + df.format(x) + "," + logL + ",mtadb_higher_res\n"); // adapt strings
+            writer.write("lifetime0," + df.format(x) + "," + logL + ",mtadb\n"); // adapt strings
         }
         writer.close();
     }
