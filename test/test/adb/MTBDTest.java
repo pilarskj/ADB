@@ -22,11 +22,11 @@ public class MTBDTest {
 
         // simulated tree (typed)
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/tiptree_bdmm.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
-        double t_or = 20; // 10
+        double t_or = 20;
         int type_or = 0;
         double[] a = {2, 5};
         double[] b = {1, 1};
@@ -39,8 +39,8 @@ public class MTBDTest {
         int maxIt = 100;
         double tolP = 1e-12;
         double tolB = 1e-6;
-        int mP = (int)Math.pow(2, 14);
-        int mB = (int)Math.pow(2, 12);
+        int mP = (int)Math.pow(2, 12);
+        int mB = (int)Math.pow(2, 10);
 
         // get branches
         BranchList branches = new BranchList(tree, t_or, type_or);
@@ -113,7 +113,7 @@ public class MTBDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/tiptree_bdmm.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -136,7 +136,7 @@ public class MTBDTest {
                 "rhoSampling", new TimedParameter(
                         new RealParameter("20"),
                         new RealParameter("1"), 2),
-                "removalProb", new SkylineVectorParameter(null, new RealParameter("0"), 2));
+                "removalProb", new SkylineVectorParameter(null, new RealParameter("1"), 2));
 
         BirthDeathMigrationDistribution density = new BirthDeathMigrationDistribution();
         density.initByName(
@@ -144,7 +144,7 @@ public class MTBDTest {
                 "startTypePriorProbs", new RealParameter("1 0"),
                 "tree", tree,
                 "typeLabel", "type",
-                "parallelize", false);
+                "parallelize", true);
 
         double logL = density.calculateLogP();
         System.out.println(logL);
@@ -156,13 +156,13 @@ public class MTBDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/tiptree_bdmm.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
         // fix all but one parameter
         int ntypes = 2;
-        double t_or = 20;
+        double t_or = 20; // 10
         int type_or = 0;
         double[] a = {2, 5};
         double[] d = {0.1, 0.2};
@@ -174,11 +174,12 @@ public class MTBDTest {
         double start = 0.5;
         double end = 10;
         double step = 0.5;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/loglik_tree_bdmm.csv", false);
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/mtADB/loglik/loglik_tree_bdmm.csv", false);
         DecimalFormat df = new DecimalFormat("0.0");
+        writer.write("parameter,value,logL,method\n");
         for (double x = start; x <= end; x += step) {
 
-            // change theta1
+            // change parameter
             a[0] = x;
 
             // calculate BDMM parameters
@@ -229,7 +230,7 @@ public class MTBDTest {
                     "rhoSampling", new TimedParameter(
                             new RealParameter(Double.toString(t_or)),
                             new RealParameter(Double.toString(rho)), ntypes),
-                    "removalProb", new SkylineVectorParameter(null, new RealParameter("0"), ntypes));
+                    "removalProb", new SkylineVectorParameter(null, new RealParameter("1"), ntypes));
 
             BirthDeathMigrationDistribution density = new BirthDeathMigrationDistribution();
             density.initByName(
@@ -251,7 +252,7 @@ public class MTBDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/tiptree_bdmm.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -264,7 +265,7 @@ public class MTBDTest {
         double[] d = {0.1, 0.2};
         double rho = 1;
         double[][] Xsi_s = {{0.2, 0}, {0, 0.6}};
-        double[][] Xsi_as = {{0, 0.4}, {0.2, 0}};
+        double[][] Xsi_as = {{0, 0.8}, {0.4, 0}};
 
         // options
         int maxIt = 100;
@@ -280,11 +281,11 @@ public class MTBDTest {
         double start = 0.5;
         double end = 10;
         double step = 0.5;
-        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/P1_AgeDependentTrees/multi-type/loglik_tree_bdmm.csv", true);
+        FileWriter writer = new FileWriter("/Users/jpilarski/Projects/mtADB/loglik/loglik_tree_bdmm.csv", true);
         DecimalFormat df = new DecimalFormat("0.0");
         for (double x = start; x <= end; x += step) {
 
-            // change theta1
+            // change parameter
             a[0] = x;
 
             double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
