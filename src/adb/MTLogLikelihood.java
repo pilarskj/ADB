@@ -30,7 +30,7 @@ public class MTLogLikelihood {
     public static double calcMTLogLikelihood(double[] a, double[] b, double[] d, double rho,
                                              double[][] Xsi_s, double[][] Xsi_as,
                                              double t_or, int type_or, BranchList branches,
-                                             int maxIt, double tolP, double tolB, int mP, int mB) {
+                                             int maxIt, double tolP, double tolB, int mP, int mB) { // TODO: rename parameters?
 
         // get number of types
         int ntypes = a.length;
@@ -359,7 +359,7 @@ public class MTLogLikelihood {
 
         return X;
     }
-    
+
 
     // Function for calculating branch probabilities
     public static double[][][] calcMTB(double[] a, double[] b, double[] d, double[][] Xsi_s, double[][] Xsi_as,

@@ -40,7 +40,7 @@ public class BranchList {
             double startTime = node.getHeight();
             int endNode;
             double endTime;
-            if (parent == null) {
+            if (parent == null) { // stem branch
                 endNode = startNode + 1;
                 endTime = originTime;
             } else {
@@ -51,8 +51,8 @@ public class BranchList {
             // get start and end type
             int startType;
             int endType;
-            Object nodeType = node.getMetaData("type");
-            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = 0; } // or -1
+            Object nodeType = node.getMetaData("type"); // TODO: allow for custom type label
+            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = 0; } // or -1 // TODO: adapt default types
             if (parent == null) {
                 endType = originType;
             } else {
@@ -81,9 +81,7 @@ public class BranchList {
 
     // Assign branch indices
     private void assignBranchIndices() {
-        int ntips = (int) branches.stream()
-                .filter(b -> b.branchMode.equals("external"))
-                .count();
+        int ntips = countExternalBranches();
 
         int intIndex = 0;
         int extIndex = ntips - 1;
