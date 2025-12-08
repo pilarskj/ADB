@@ -43,7 +43,7 @@ public class MTBDTest {
         int mB = (int)Math.pow(2, 10);
 
         // get branches
-        BranchList branches = new BranchList(tree, t_or, type_or);
+        BranchList branches = new BranchList(tree, t_or);
 
         int n_int = branches.countInternalBranches();
         int n_ext = branches.countExternalBranches();
@@ -82,7 +82,7 @@ public class MTBDTest {
         int mB = (int)Math.pow(2, 12);
 
         // get branches
-        BranchList branches = new BranchList(tree, t_or, type_or);
+        BranchList branches = new BranchList(tree, t_or);
 
         double logL = calcMTLogLikelihood(a, b, d, rho, Xsi_s, Xsi_as, t_or, type_or, branches,
                 maxIt, tolP, tolB, mP, mB);
@@ -113,7 +113,7 @@ public class MTBDTest {
 
         // get tree
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/profiling/tree_50.newick", //"/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick",
                 "IsLabelledNewick", true,
                 "adjustTipHeights", true);
 
@@ -121,7 +121,7 @@ public class MTBDTest {
         Parameterization parameterization = new CanonicalParameterization();
         parameterization.initByName(
                 "typeSet", new TypeSet(2),
-                "processLength", new RealParameter("20"),
+                "processLength", new RealParameter("40"),
                 "birthRate", new SkylineVectorParameter(
                         null,
                         new RealParameter("0.09 0.096"), 2),
@@ -134,8 +134,8 @@ public class MTBDTest {
                 "migrationRate", new SkylineMatrixParameter(null, new RealParameter("0"), 2),
                 "samplingRate", new SkylineVectorParameter(null, new RealParameter("0"), 2),
                 "rhoSampling", new TimedParameter(
-                        new RealParameter("20"),
-                        new RealParameter("1"), 2),
+                        new RealParameter("40"),
+                        new RealParameter("0.5"), 2),
                 "removalProb", new SkylineVectorParameter(null, new RealParameter("1"), 2));
 
         BirthDeathMigrationDistribution density = new BirthDeathMigrationDistribution();
@@ -275,7 +275,7 @@ public class MTBDTest {
         int mB = (int)Math.pow(2, 12);
 
         // get branches
-        BranchList branches = new BranchList(tree, t_or, type_or);
+        BranchList branches = new BranchList(tree, t_or);
 
         // loop over different parameter values
         double start = 0.5;

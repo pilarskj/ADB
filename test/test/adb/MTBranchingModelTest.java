@@ -15,10 +15,8 @@ public class MTBranchingModelTest {
     public void testMTBranchingModel() throws Exception {
 
         // define tree
-        // Tree tree = new TreeParser("((D:5.0,C:5.0):6.0,(A:8.0,B:8.0):3.0):0.0;", false); // (very small)
-        // alternatively, read a tree from .newick file
         Tree tree = new TreeFromNewickFile();
-        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/trees/tiptree_bdmm.newick", "IsLabelledNewick", true, "adjustTipHeights", true);
+        tree.initByName("fileName", "/Users/jpilarski/Projects/mtADB/profiling/tree_1_size.newick", "IsLabelledNewick", true, "adjustTipHeights", true);
 
         // initialize and set parameters
         MTBranchingModel model = new MTBranchingModel();
@@ -28,7 +26,7 @@ public class MTBranchingModelTest {
                 "death", new RealParameter("0.1 0.2"),
                 "sTransitions", new RealParameter("0.2 0 0 0.6"),
                 "asTransitions", new RealParameter("0 0.8 0.4 0"),
-                "rho", new RealParameter("1"),
+                "rho", new RealParameter("0.5"),
                 "originTime", 20.0,
                 "originType", 0);
 

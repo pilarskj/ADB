@@ -13,16 +13,16 @@ Keeps track of start and end time, left and right child, and type of each branch
 public class BranchList {
     private List<Branch> branches;
 
-    public BranchList(TreeInterface tree, double originTime, int originType) {
+    public BranchList(TreeInterface tree, double originTime) {
         branches = new ArrayList<>();
-        traverseTree(tree, originTime, originType);
+        traverseTree(tree, originTime);
         assignBranchIndices();
         branches.sort(Comparator.comparingInt(b -> b.branchIndex)); // sort by index
         findChildBranches();
     }
 
     // BFS traversal method to add branches to the list
-    private void traverseTree(TreeInterface tree, double originTime, int originType) {
+    private void traverseTree(TreeInterface tree, double originTime) {
         Node root = tree.getRoot();
         if (root == null) {
             return;
@@ -49,16 +49,17 @@ public class BranchList {
             }
 
             // get start and end type
-            int startType;
-            int endType;
+            int branchType;
+            // int startType;
+            // int endType;
             Object nodeType = node.getMetaData("type"); // TODO: allow for custom type label
-            if (nodeType != null) { startType = ((Double) nodeType).intValue(); } else { startType = 0; } // or -1 // TODO: adapt default types
-            if (parent == null) {
+            if (nodeType != null) { branchType = ((Double) nodeType).intValue(); } else { branchType = -1; }
+            /* if (parent == null) {
                 endType = originType;
             } else {
                 Object parentType = parent.getMetaData("type");
-                if (parentType != null) { endType = ((Double) parentType).intValue(); } else { endType = 0; } // or -1
-            }
+                if (parentType != null) { endType = ((Double) parentType).intValue(); } else { endType = -1; } // or 0
+            } */
 
             // get mode
             String branchMode;
@@ -68,7 +69,7 @@ public class BranchList {
                 branchMode = "internal";
             }
 
-            branches.add(new Branch(startNode, endNode, startTime, endTime, startType, endType, branchMode)); // add branch to list
+            branches.add(new Branch(startNode, endNode, startTime, endTime, branchType, branchMode)); // add branch to list
 
             if (node.getLeft() != null) {
                 queue.add(node.getLeft()); // enqueue left child
@@ -81,10 +82,10 @@ public class BranchList {
 
     // Assign branch indices
     private void assignBranchIndices() {
-        int ntips = countExternalBranches();
+        int nint = countInternalBranches();
 
         int intIndex = 0;
-        int extIndex = ntips - 1;
+        int extIndex = nint;
         for (Branch b : branches) {
             if (b.branchMode.equals("internal")) {
                 b.branchIndex = intIndex;
@@ -104,8 +105,10 @@ public class BranchList {
                         .filter(x -> x.endNode == b.startNode) // filter branches where endNode matches startNode
                         .map(x -> x.branchIndex) // get the index of matching branches
                         .toList();
-                b.leftIndex = children.get(0);
-                b.rightIndex = children.get(1);
+                b.leftIndex = children.get(0); // put single child to the left
+                if (children.size() == 2) {
+                    b.rightIndex = children.get(1);
+                }
             }
         }
     }

@@ -185,7 +185,7 @@ public class MTBranchingModel extends SpeciesTreeDistribution { // TODO: change 
         }
 
         // get list of branches in the tree (annotated with types)
-        branches = new BranchList(tree, originTime, originType);
+        branches = new BranchList(tree, originTime);
 
         // calculate likelihood
         double logL = MTLogLikelihood.calcMTLogLikelihood(scale, shape, death, rho, sTransitions, asTransitions, originTime, originType, branches,

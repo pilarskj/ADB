@@ -38,7 +38,7 @@ public class MTLogLikelihood {
         assert d.length == ntypes;
 
         // assert type at origin
-        assert branches.getBranchByIndex(0).endType == type_or;
+        // assert branches.getBranchByIndex(0).endType == type_or;
 
         // generate linearly spaced values between 0 and origin
         int m = mP; // the number of time steps must be a power of 2 (required by FFT!)
@@ -186,7 +186,7 @@ public class MTLogLikelihood {
         Branch branch = branches.getBranchByIndex(stem_index);
         // at tips
         if (stem_index >= ntips - 1) {
-            result = new SmallNumber(P1Map.get(new Pair<>(stem_type, branch.startType)).value(branch.endTime));
+            result = new SmallNumber(P1Map.get(new Pair<>(stem_type, branch.branchType)).value(branch.endTime));
 
         } else {
             // recursion
