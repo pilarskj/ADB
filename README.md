@@ -38,10 +38,10 @@ This package requires Java 17 and at least BEAST v2.7.
 
 Currently, you can run a bundled version of the package and its dependencies on the command line.
 
-To run ADB with the example.xml, use the following command:
+To run ADB with the example XML, use the following command:
 
 ```bash
-java -jar bin/ADB.jar examples/example.xml
+java -jar bin/ADB.jar example/inference.xml
 ```
 and specify the package versions using `-version_file version.xml`.
 
