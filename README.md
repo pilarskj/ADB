@@ -61,8 +61,8 @@ In the XML, you can adjust settings for the numerical solution of the phylodynam
 
 In practice, we recommend to always use the approximation when running MCMC. 
 We advice to use a step size of at least $`2^{10}`$ (`1024`) if $`\rho \gtrsim 50\%`$, $`2^{12}`$ (`4096`) if $`\rho \gtrsim 10\%`$, and $`2^{14}`$ (`16384`) if $`\rho \gtrsim 1\%`$.
-At lower sampling proportions and when $`d`$ approaches $`0.5`$, the analyses tend to accumulate numerical errors and have convergence issues.
-Additionally, if the shape parameter is expected to be low $`k \lesssim 20`$, we suggest putting informative priors on at least one of $`d, \rho`$ due to non-identifiability concerns.
+At lower sampling proportions when $`k \lesssim 20`$ and when $`d`$ approaches $`0.5`$, the analyses tend to accumulate numerical errors and have convergence issues.
+Additionally, if the shape parameter is expected to be low ($`k \lesssim 20`$), we suggest putting informative priors on at least one of $`d, \rho`$ due to non-identifiability concerns.
 
 :warning: Note that the model is currently validated for phylodynamic inference from *fixed* phylogenetic trees.
 Operators enabling joint tree and parameter inference from sequence alignments are under development. 
