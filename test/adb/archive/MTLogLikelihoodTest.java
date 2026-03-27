@@ -1,6 +1,5 @@
-package test.adb;
+package adb.archive;
 
-import adb.BranchList;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import feast.fileio.TreeFromNewickFile;
@@ -11,8 +10,8 @@ import java.io.FileWriter;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 
-import static adb.MTLogLikelihood.calcMTLogLikelihood;
-import static adb.MTLogLikColored.calcMTLogLikColored;
+import static adb.archive.MTLogLikelihood.calcMTLogLikelihood;
+import static adb.archive.MTLogLikColored.calcMTLogLikColored;
 
 public class MTLogLikelihoodTest {
 

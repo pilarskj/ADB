@@ -1,6 +1,5 @@
-package test.adb;
+package adb.archive;
 
-import adb.GammaBranchingModel;
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
 import bdsky.evolution.speciation.BirthDeathSkylineModel;
@@ -60,7 +59,7 @@ public class BDTest {
                 "adjustTipHeights", true);
 
         // initialize
-        Parameterization parameterization = new CanonicalParameterization();
+        bdmmprime.parameterization.Parameterization parameterization = new CanonicalParameterization();
         parameterization.initByName(
                 "typeSet", new TypeSet(1),
                 "processLength", new RealParameter("50"),
@@ -163,7 +162,7 @@ public class BDTest {
             double lambda = (1 - d) / C;
             double mu = d / C;
 
-            Parameterization parameterization = new CanonicalParameterization();
+            bdmmprime.parameterization.Parameterization parameterization = new CanonicalParameterization();
             parameterization.initByName(
                     "typeSet", new TypeSet(1),
                     "processLength", new RealParameter(Double.toString(origin)),

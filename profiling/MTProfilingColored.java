@@ -12,7 +12,7 @@ import java.io.FileWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import static adb.MTLogLikColored.calcMTLogLikColored;
+import static adb.distribution.MTLogLikColored.calcMTLogLikColored;
 
 public class MTProfilingColored {
 

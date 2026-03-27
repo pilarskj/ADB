@@ -1,6 +1,6 @@
 package test.adb;
 
-import adb.MTBranchingModel;
+import adb.distribution.MTBranchingModel;
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
 import beast.base.evolution.tree.Tree;

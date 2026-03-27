@@ -1,19 +1,13 @@
-package adb;
+package adb.archive;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
-import beast.base.evolution.tree.TraitSet;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
 import beast.base.inference.parameter.RealParameter;
-
-import java.util.Arrays;
-
-import static adb.MTLogLikelihood.calcMTLogLikelihood;
-import static org.apache.commons.math3.special.Gamma.logGamma;
 
 
 @Description("This class implements a multi-type Age-Dependent Branching (mtADB) model " +

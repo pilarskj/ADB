@@ -1,7 +1,5 @@
-package test.adb;
+package adb.archive;
 
-import adb.Branch;
-import adb.BranchList;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.evolution.tree.Node;
 

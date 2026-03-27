@@ -1,4 +1,4 @@
-package adb;
+package adb.archive;
 
 // Class to store all information about a branch
 public class Branch {

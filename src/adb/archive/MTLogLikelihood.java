@@ -1,20 +1,16 @@
-package adb;
+package adb.archive;
 
+import adb.util.Utils;
 import bdmmprime.distribution.SmallNumber;
 import org.apache.commons.math3.analysis.UnivariateFunction;
-import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
-import org.apache.commons.math3.transform.DftNormalization;
-import org.apache.commons.math3.transform.FastFourierTransformer;
-import org.apache.commons.math3.transform.TransformType;
 import org.apache.commons.math3.util.Pair;
 
 import java.util.HashMap;
 import java.util.stream.IntStream;
 
-import static adb.GammaLogLikelihood.convolveFFT;
-import static adb.GammaLogLikelihood.padZeros;
+import static adb.util.Utils.TRANSFORM_FORWARD;
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
 /*
@@ -23,9 +19,6 @@ and for calculating the likelihood of a tip-typed tree
 (based on the parameters, branching times, and types at tips).
  */
 public class MTLogLikelihood {
-
-    public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-    public static LinearInterpolator interpolator = new LinearInterpolator();
 
     public static double calcMTLogLikelihood(double[] a, double[] b, double[] d, double rho,
                                              double[][] Xsi_s, double[][] Xsi_as,
@@ -64,7 +57,7 @@ public class MTLogLikelihood {
                     }
 
                     // perform FFT
-                    Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
+                    Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
                     for (int w = 0; w < m*2; w++) {
                         pdfFFT[w][i] = Ft[w];
                     }
@@ -96,7 +89,7 @@ public class MTLogLikelihood {
             for (int w = 0; w < m ; w++) {
                 extP0[w + 1] = P0[w][i];
             }
-            UnivariateFunction function = interpolator.interpolate(extSeq, extP0);
+            UnivariateFunction function = Utils.interpolator.interpolate(extSeq, extP0);
             P0Map.put(i, function);
         }
 
@@ -119,7 +112,7 @@ public class MTLogLikelihood {
                     extP1[w + 1] = P1[w][i][j];
                 }
                 // interpolate
-                UnivariateFunction function = interpolator.interpolate(extSeq, extP1);
+                UnivariateFunction function = Utils.interpolator.interpolate(extSeq, extP1);
                 P1Map.put(new Pair<>(i, j), function);
             }
         }
@@ -266,7 +259,7 @@ public class MTLogLikelihood {
                 }
 
                 // partially convolve
-                double[] I = convolveFFT(Ft, y, m, dx);
+                double[] I = Utils.convolveFFT(Ft, y, m, dx);
 
                 // sum
                 for (int w = 0; w < m; w++) {
@@ -275,7 +268,7 @@ public class MTLogLikelihood {
             }
 
             // compute error
-            err = getMatrixError(X, Xi);
+            err = Utils.getMatrixError(X, Xi);
 
             // update
             X = Xi;
@@ -336,7 +329,7 @@ public class MTLogLikelihood {
                     }
 
                     // partially convolve
-                    double[] I = convolveFFT(Ft, y, m, dx);
+                    double[] I = Utils.convolveFFT(Ft, y, m, dx);
 
                     // sum
                     for (int w = 0; w < m; w++) {
@@ -346,7 +339,7 @@ public class MTLogLikelihood {
             }
 
             // compute error
-            err = getMatrixError3D(X, Xi);
+            err = Utils.getMatrixError3D(X, Xi);
 
             // update
             X = Xi;
@@ -406,7 +399,7 @@ public class MTLogLikelihood {
                         }
 
                         // perform FFT
-                        Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
+                        Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
                         for (int w = 0; w < m*2; w++) {
                             pdfFFT[w][i] = Ft[w];
                         }
@@ -439,7 +432,7 @@ public class MTLogLikelihood {
                                 }
 
                                 // partially convolve
-                                double[] I = convolveFFT(Ft, y, m, dx);
+                                double[] I = Utils.convolveFFT(Ft, y, m, dx);
 
                                 // sum
                                 for (int w = 0; w < m; w++) {
@@ -449,7 +442,7 @@ public class MTLogLikelihood {
                         }
 
                         // compute error
-                        err = getMatrixError3D(X, Xi);
+                        err = Utils.getMatrixError3D(X, Xi);
 
                         // update
                         X = Xi;
@@ -469,63 +462,6 @@ public class MTLogLikelihood {
                 });
 
         return B;
-    }
-
-
-    // Helper method for calculating the 1-(Manhattan)-distance between two matrices,
-    // which is the maximum absolute column sum of the matrices substracted element-wise
-    private static double getMatrixError(double[][] X, double[][] Y) {
-        int n = X.length; // number of rows
-        int m = X[0].length;  // number of columns
-
-        double maxColSum = 0;
-
-        // iterate through each column
-        for (int col = 0; col < m; col++) {
-            double colSum = 0;
-
-            // sum the absolute differences for this column
-            for (int row = 0; row < n; row++) {
-                colSum += Math.abs(X[row][col] - Y[row][col]);
-            }
-
-            // Update maxColumnSum if this column has a larger sum
-            if (colSum > maxColSum) {
-                maxColSum = colSum;
-            }
-        }
-
-        return maxColSum;
-    }
-
-
-    // Helper method for calculating the distance between two 3D arrays
-    private static double getMatrixError3D(double[][][] X, double[][][] Y){
-        int n = X.length; // number of arrays
-        int m = X[0].length;  // number of rows
-        int o = X[0][0].length;  // number of columns
-
-        double maxSum = 0;
-
-        // iterate over arrays
-        for (int i = 0; i < n; i++) {
-            double sum = 0;
-
-            // substract matrices element-wise
-            for (int row = 0; row < m; row++) {
-                for (int col = 0; col < o; col++) {
-                    // sum the absolute differences for each element
-                    sum += Math.abs(X[i][row][col] - Y[i][row][col]);
-                }
-            }
-
-            // update maxSum if this array has a larger sum
-            if (sum > maxSum) {
-                maxSum = sum;
-            }
-        }
-
-        return maxSum;
     }
 
 }

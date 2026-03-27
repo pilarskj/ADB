@@ -3,8 +3,8 @@
   <depends on="BEAST.app" atleast="2.7.0" atmost="2.7.9"/>
 
   <service type="beast.base.core.BEASTInterface">
-    <provider classname="adb.GammaBranchingModel"/>
-    <provider classname="adb.MTBranchingModel"/>
-    <provider classname="adb.MatrixDeltaExchangeOperator"/>
+    <provider classname="adb.archive.GammaBranchingModel"/>
+    <provider classname="adb.archive.MTBranchingModel"/>
+    <provider classname="adb.operators.MatrixDeltaExchangeOperator"/>
   </service>
 </package>

@@ -1,25 +1,19 @@
-package adb;
+package adb.archive;
 
+import adb.util.Utils;
 import bdmmprime.distribution.SmallNumber;
 import org.apache.commons.math3.analysis.UnivariateFunction;
-import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
-import org.apache.commons.math3.transform.DftNormalization;
-import org.apache.commons.math3.transform.FastFourierTransformer;
-import org.apache.commons.math3.transform.TransformType;
 
 import java.util.HashMap;
 import java.util.stream.IntStream;
 
-import static adb.GammaLogLikelihood.padZeros;
-import static adb.MTLogLikelihood.calcMTP0;
+import static adb.archive.MTLogLikelihood.calcMTP0;
+import static adb.util.Utils.TRANSFORM_FORWARD;
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
 public class MTLogLikColored {
-
-    public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-    public static LinearInterpolator interpolator = new LinearInterpolator();
 
     public static double calcMTLogLikColored(double[] a, double[] b, double[] d, double rho,
                                              double[][] Xsi_s, double[][] Xsi_as,
@@ -53,7 +47,7 @@ public class MTLogLikColored {
                     }
 
                     // perform FFT
-                    Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD);
+                    Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
                     for (int w = 0; w < m*2; w++) {
                         pdfFFT[w][i] = Ft[w];
                     }
@@ -80,7 +74,7 @@ public class MTLogLikColored {
             for (int w = 0; w < m ; w++) {
                 extP0[w + 1] = P0[w][i];
             }
-            UnivariateFunction function = interpolator.interpolate(extSeq, extP0);
+            UnivariateFunction function = Utils.interpolator.interpolate(extSeq, extP0);
             P0Map.put(i, function);
         }
 

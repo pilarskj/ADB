@@ -1,18 +1,16 @@
-package adb;
+package adb.archive;
 
+import adb.util.Utils;
 import beast.base.core.Log;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
-import org.apache.commons.math3.transform.DftNormalization;
-import org.apache.commons.math3.transform.FastFourierTransformer;
-import org.apache.commons.math3.transform.TransformType;
-import org.apache.commons.math3.ml.distance.EuclideanDistance;
-import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
+
+import static adb.util.Utils.TRANSFORM_FORWARD;
 
 
 /*
@@ -21,9 +19,6 @@ and for calculating the probability of a tree based on its branching times given
  */
 public class GammaLogLikelihood {
 
-    private static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-    private static EuclideanDistance norm = new EuclideanDistance();
-    private static LinearInterpolator interpolator = new LinearInterpolator();
 
     // Nested class to hold densities
     public static class Densities {
@@ -73,7 +68,7 @@ public class GammaLogLikelihood {
         System.arraycopy(P1, 0, extP1, 1, P1.length);
 
         // interpolate P1
-        UnivariateFunction function = interpolator.interpolate(extSeq, extP1);
+        UnivariateFunction function = Utils.interpolator.interpolate(extSeq, extP1);
 
         // sum probabilities over external branches
         double logP1 = 0;
@@ -127,7 +122,7 @@ public class GammaLogLikelihood {
             pdf[i] = Math.exp(gammaDist.logDensity(tSeq[i])); // gammaDist.density(tSeq[i]) - use log to prevent underflow
             cdf[i] = gammaDist.cumulativeProbability(tSeq[i]);
         }
-        Complex[] pdfFFT = fft.transform(padZeros(pdf), TransformType.FORWARD);
+        Complex[] pdfFFT = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
 
         return new Densities(pdfFFT, cdf, tSeq, dx);
     }
@@ -160,7 +155,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(pdfFFT, y, n, dx);
+            double[] I = Utils.convolveFFT(pdfFFT, y, n, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -170,13 +165,13 @@ public class GammaLogLikelihood {
 
             // add regularization: force values to be non-increasing or non-decreasing
             if ((1-rho) > d/(1-d)) {
-                forceOrder(Xi, "non-increasing");
+                Utils.forceOrder(Xi, "non-increasing");
             } else if ((1-rho) < d/(1-d)) {
-                forceOrder(Xi, "non-decreasing");
+                Utils.forceOrder(Xi, "non-decreasing");
             }
 
             // compute error
-            err = norm.compute(Xi, X);
+            err = Utils.l2distance.compute(Xi, X);
 
             // update
             X = Xi;
@@ -220,7 +215,7 @@ public class GammaLogLikelihood {
             }
 
             // partially convolve
-            double[] I = convolveFFT(pdfFFT, y, n, dx);
+            double[] I = Utils.convolveFFT(pdfFFT, y, n, dx);
 
             // sum
             double[] Xi = new double[n];
@@ -229,7 +224,7 @@ public class GammaLogLikelihood {
             }
 
             // compute error
-            err = norm.compute(X, Xi);
+            err = Utils.l2distance.compute(X, Xi);
 
             // update
             X = Xi;
@@ -253,7 +248,7 @@ public class GammaLogLikelihood {
         GammaDistribution gammaDist = new GammaDistribution(b.doubleValue(), a);
 
         // interpolate P0
-        UnivariateFunction function = interpolator.interpolate(t0, P0);
+        UnivariateFunction function = Utils.interpolator.interpolate(t0, P0);
 
         // get number of branches
         assert s.length == e.length; // for each branch, a start and end time must be given
@@ -285,7 +280,7 @@ public class GammaLogLikelihood {
                         pdf[i] = Math.exp(gammaDist.logDensity(age_seq[i]));
                         P[i] = function.value(tSeq[i]);
                     }
-                    Complex[] Ft = fft.transform(padZeros(pdf), TransformType.FORWARD); // perform FFT
+                    Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD); // perform FFT
 
                     // initialize
                     double[] X0 = new double[m];
@@ -308,7 +303,7 @@ public class GammaLogLikelihood {
                         }
 
                         // partially convolve
-                        double[] I = convolveFFT(Ft, y, m, dx);
+                        double[] I = Utils.convolveFFT(Ft, y, m, dx);
 
                         // sum
                         double[] Xi = new double[m];
@@ -317,7 +312,7 @@ public class GammaLogLikelihood {
                         }
 
                         // compute error
-                        err = norm.compute(X, Xi);
+                        err = Utils.l2distance.compute(X, Xi);
 
                         // update
                         X = Xi;
@@ -361,8 +356,8 @@ public class GammaLogLikelihood {
 
                     // get average P0 over branch
                     // use binary search to find closest indices to the branch lengths in t0 (t0 is sorted per definition!)
-                    double[] P0Slice = Arrays.copyOfRange(P0, findClosestIndex(t0, sx), findClosestIndex(t0, ex) + 1);
-                    double P0M = getMean(P0Slice);
+                    double[] P0Slice = Arrays.copyOfRange(P0, Utils.findClosestIndex(t0, sx), Utils.findClosestIndex(t0, ex) + 1);
+                    double P0M = Utils.getMean(P0Slice);
 
                     // initialize the approximation
                     int k = (int) ((ex - sx) / (a * b)); // around this k, the term b_k will be maximal
@@ -390,99 +385,6 @@ public class GammaLogLikelihood {
         return B;
     }
 
-
-    // Function for partial convolution using FFT
-    protected static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
-
-        // perform FFT on padded y
-        Complex[] fy = fft.transform(padZeros(y), TransformType.FORWARD);
-
-        // element-wise multiplication of fx and fy (convolution in Fourier space)
-        Complex[] fz = new Complex[fx.length];
-        for (int i = 0; i < fx.length; i++) {
-            fz[i] = fx[i].multiply(fy[i]);
-        }
-
-        // perform inverse FFT to get the result back in time domain
-        Complex[] z = fft.transform(fz, TransformType.INVERSE);
-
-        // extract the real part and scale it by eps
-        double[] z_real = new double[n];
-        for (int i = 0; i < n; i++) {
-            z_real[i] = z[i].getReal() * eps;
-        }
-
-        return z_real;
-    }
-
-
-    // Helper method to pad an array with 0 to its double length
-    protected static double[] padZeros(double[] x) {
-        int n = x.length;
-        double[] xp = new double[n * 2];
-        System.arraycopy(x, 0, xp, 0, n);
-        return xp;
-    }
-
-
-    // Helper method to find the index of the closest value in a sorted array using binary search
-    // https://stackoverflow.com/questions/30245166/find-the-nearest-closest-value-in-a-sorted-list
-    // complexity log(n) instead of n in a loop
-    private static int findClosestIndex(double[] array, double value) {
-        // if value is at boundaries
-        if (value <= array[0]) {
-            return 0;
-        }
-        if (value >= array[array.length - 1]) {
-            return array.length - 1;
-        }
-
-        // do binary search
-        int index = Arrays.binarySearch(array, value);
-
-        if (index >= 0) { // exact match found
-            return index;
-        } else { // no exact match: binarySearch returns (-(insertion point) - 1)
-            int insertionPoint = -(index + 1);
-
-            // return the index of the closest value
-            if ((value - array[insertionPoint - 1]) <= (array[insertionPoint] - value)) { // value is closer to the previous value
-                return insertionPoint - 1;
-            } else { // value is closer to the next value
-                return insertionPoint;
-            }
-        }
-    }
-
-
-    // Helper method to calculate the mean of an array
-    private static double getMean(double[] array) {
-        double sum = 0;
-        for (double num : array) {
-            sum += num;
-        }
-        return sum / array.length;
-    }
-
-
-    // Helper method to enforce non-increasing or non-decreasing array
-    private static void forceOrder(double[] array, String order) {
-        if (order.equals("non-increasing")) {
-            for (int i = 1; i < array.length; i++) {
-                if (array[i] > array[i - 1]) {
-                    array[i] = array[i - 1];  // adjust to maintain non-increasing order
-                }
-            }
-        } else if (order.equals("non-decreasing")) {
-            for (int i = 1; i < array.length; i++) {
-                if (array[i] < array[i - 1]) {
-                    array[i] = array[i - 1];  // adjust to maintain non-decreasing order
-                }
-            }
-        } else {
-            throw new IllegalArgumentException("Invalid order: use non-increasing or non-decreasing");
-        }
-    }
 
 
     // Simpler function for calculating the log likelihood of a birth-death tree with sampling (Stadler, JTB 2010, DOI 10.1016/j.jtbi.2010.09.010)

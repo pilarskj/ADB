@@ -1,6 +1,5 @@
-package test.adb;
+package adb.archive;
 
-import adb.BranchList;
 import bdmmprime.distribution.BirthDeathMigrationDistribution;
 import bdmmprime.parameterization.*;
 import beast.base.evolution.tree.Tree;
@@ -13,7 +12,7 @@ import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import static adb.MTLogLikelihood.calcMTLogLikelihood;
+import static adb.archive.MTLogLikelihood.calcMTLogLikelihood;
 
 public class MTBDTest {
 
@@ -118,7 +117,7 @@ public class MTBDTest {
                 "adjustTipHeights", true);
 
         // initialize
-        Parameterization parameterization = new CanonicalParameterization();
+        bdmmprime.parameterization.Parameterization parameterization = new CanonicalParameterization();
         parameterization.initByName(
                 "typeSet", new TypeSet(2),
                 "processLength", new RealParameter("40"),
@@ -212,7 +211,7 @@ public class MTBDTest {
                     .collect(Collectors.joining(" "));
             String deathRateS = Arrays.stream(deathRate).mapToObj(Double::toString).collect(Collectors.joining(" "));
 
-            Parameterization parameterization = new CanonicalParameterization();
+            bdmmprime.parameterization.Parameterization parameterization = new CanonicalParameterization();
             parameterization.initByName(
                     "typeSet", new TypeSet(ntypes),
                     "processLength", new RealParameter(Double.toString(t_or)),

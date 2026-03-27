@@ -1,11 +1,11 @@
-package test.adb;
+package adb.operators;
 
 import beast.base.util.Randomizer;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
 
-import static adb.MatrixDeltaExchangeOperator.randomSample;
+import static adb.operators.MatrixDeltaExchangeOperator.randomSample;
 
 public class MatrixTest {
 

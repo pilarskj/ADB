@@ -1,4 +1,4 @@
-package adb;
+package adb.operators;
 
 import beast.base.core.Description;
 import beast.base.core.Input;
@@ -15,6 +15,7 @@ import java.util.Map;
 
 
 /* Adapted from beast.base.inference.operator.DeltaExchangeOperator */
+// TODO: compatible with any [0,1] priors on transition probabilities?
 @Description("Operator for row-wise sum-constrained parameters.")
 public class MatrixDeltaExchangeOperator extends Operator {
 

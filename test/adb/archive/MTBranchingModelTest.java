@@ -1,9 +1,6 @@
-package test.adb;
+package adb.archive;
 
-import adb.MTBranchingModel;
 import beast.base.evolution.tree.Tree;
-import beast.base.evolution.tree.TreeParser;
-import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
 import feast.fileio.TreeFromNewickFile;
 import org.junit.jupiter.api.Test;

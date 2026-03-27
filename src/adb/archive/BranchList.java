@@ -1,4 +1,4 @@
-package adb;
+package adb.archive;
 
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
