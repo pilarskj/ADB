@@ -13,9 +13,8 @@ public class ParameterizationTest {
                 "lifetime", new RealParameter("2 5"),
                 "shape", new RealParameter("1 1"),
                 "death", new RealParameter("0.1 0.2"),
-                "transitions", new RealParameter("0.2 0.8 0.4 0.6"),
-                //"sTransitions", new RealParameter("0.2 0 0 0.6"),
-                //"asTransitions", new RealParameter("0 0.8 0.4 0"),
+                "symTransitions", new RealParameter("0.2 0 0 0.6"),
+                "asymTransitions", new RealParameter("0 0.8 0.4 0"),
                 "sampling", new RealParameter("0.5 0.5"),
                 "originTime", 20.0,
                 "originType", 0);

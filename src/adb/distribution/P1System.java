@@ -1,6 +1,6 @@
 package adb.distribution;
 
-import adb.distribution.LifetimeDistributions.*;
+import adb.distribution.LifetimeDistributions.LifetimeDistribution;
 import adb.util.Utils;
 import beast.base.core.Input;
 import beast.base.inference.CalculationNode;
@@ -8,13 +8,16 @@ import beast.base.inference.CalculationNode;
 import java.util.stream.IntStream;
 
 
-public class P0System extends CalculationNode {
+public class P1System extends CalculationNode {
 
     public Input<Parameterization> parameterizationInput =
             new Input<>("parameterization", "ADB parameterization", Input.Validate.REQUIRED);
 
     public Input<LifetimeDistributions> lifetimeDistributionsInput =
             new Input<>("lifetimeDistributions", "", Input.Validate.REQUIRED);
+
+    public Input<P0System> P0SystemInput =
+            new Input<>("P0System", "", Input.Validate.REQUIRED);
 
     public Input<Integer> maxIterationsInput =
             new Input<>("maxIterations", "",Input.Validate.REQUIRED);
@@ -28,6 +31,7 @@ public class P0System extends CalculationNode {
     Parameterization parameterization;
     int nTypes;
     LifetimeDistributions lifetimeDistributions;
+    P0System P0System;
 
     boolean dirty;
 
@@ -37,9 +41,9 @@ public class P0System extends CalculationNode {
     double[] timeArray;
     double timeStep;
 
-    // stores P0 for each type
-    double[][] P0;
-    double[][] storedP0;
+    // stores P1 for each type
+    double[][][] P1;
+    double[][][] storedP1;
 
 
     @Override
@@ -47,6 +51,7 @@ public class P0System extends CalculationNode {
         parameterization = parameterizationInput.get();
         nTypes = parameterization.getNTypes();
         lifetimeDistributions = lifetimeDistributionsInput.get();
+        P0System = P0SystemInput.get();
 
         maxIt = maxIterationsInput.get();
         tol = toleranceInput.get();
@@ -54,15 +59,13 @@ public class P0System extends CalculationNode {
         timeStep = timeStepInput.get();
         nSteps = timeArray.length;
 
-        P0 = new double[nTypes][nSteps];
-        storedP0 = new double[nTypes][nSteps];
+        P1 = new double[nTypes][nTypes][nSteps];
+        storedP1 = new double[nTypes][nTypes][nSteps];
         dirty = true;
-        calcP0();
+        calculateP1();
     }
 
-
-    // TODO: adapt function for calculating the extinction probability
-    private void calcP0() {
+    private void calculateP1() {
 
         if (!dirty) return;
 
@@ -74,46 +77,54 @@ public class P0System extends CalculationNode {
             rho[i] = parameterization.getSampling(i);
         }
 
+        double[][] P0 = P0System.getP0();
+
+
         // notation: it = iteration, w = integration variable (time), i,j,k = types
         // initialize matrix
-        double[][] X0 = new double[nTypes][nSteps];
+        double[][][] X0 = new double[nTypes][nTypes][nSteps];
         IntStream.range(0, nTypes)
                 .parallel()
                 .forEach(i -> {
-                    double[] cdf = distributions[i].getCDF();
+                    double[] cdf =  distributions[i].getCDF();
                     for (int w = 0; w < nSteps; w++) {
-                        X0[i][w] = (1 - rho[i]) * (1 - cdf[w]) + d[i] * cdf[w];
+                        X0[i][i][w] = rho[i] * (1 - cdf[w]);
                     }
                 });
 
         // set up iteration
         double err = 1;
         int it = 0;
-        double[][] X = X0;
+        double[][][] X = X0;
+
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][] Xi = new double[nTypes][nSteps];
+            double[][][] Xi = new double[nTypes][nTypes][nSteps];
 
             for (int i = 0; i < nTypes; i++) {
-                // get vectors for convolution
-                double[] y = new double[nSteps];
-                for (int w = 0; w < nSteps; w++) { // multiply elementwise on times
-                    for (int j = 0; j < nTypes; j++) { // sum over all types k
-                        y[w] += parameterization.getSymTransition(i,j) * X[j][w] * X[j][w] +
-                                parameterization.getAsymTransition(i,j) * X[i][w] * X[j][w];
+                for (int j = 0; j < nTypes; j++) {
+                    // get vectors for convolution
+                    double[] y = new double[nSteps];
+                    for (int w = 0; w < nSteps; w++) { // multiply elementwise on times
+                        for (int k = 0; k < nTypes; k++) { // sum over all types k
+                            y[w] += parameterization.getSymTransition(i, k) * P0[k][w] * X[k][j][w] +
+                                    0.5 * parameterization.getSymTransition(i, k) * (P0[i][w] * X[k][j][w] + P0[k][w] * X[i][j][w]);
+                        }
                     }
-                }
-                // partially convolve
-                double[] I = Utils.convolveFFT(distributions[i].getTransformedPDF(), y, nSteps, timeStep);
-                // sum
-                for (int w = 0; w < nSteps; w++) {
-                    Xi[i][w] = X0[i][w] + (1 - d[i]) * I[w];
+
+                    // partially convolve
+                    double[] I = Utils.convolveFFT(distributions[i].getTransformedPDF(), y, nSteps, timeStep);
+
+                    // sum
+                    for (int w = 0; w < nSteps; w++) {
+                        Xi[i][j][w] = X0[i][j][w] + 2 * (1 - d[i]) * I[w];
+                    }
                 }
             }
 
             // compute error
-            err = Utils.getMatrixError(X, Xi);
+            err = Utils.getMatrixError3D(X, Xi);
 
             // update
             X = Xi;
@@ -121,22 +132,19 @@ public class P0System extends CalculationNode {
         }
 
         if (it == maxIt) {
-            System.err.printf("calculateP0 Warning: max iterations reached with error: %.2f%n", err);
+            System.err.printf("calculateP1 Warning: max iterations reached with error: %.2f%n", err);
         }
 
         // set state
-        P0 = X;
-        //for (int i = 0; i < nTypes; i++) {
-        //    System.arraycopy(P0[i], 0, X[i], 0, nSteps);
-        //}
+        P1 = X;
 
         dirty = false;
     }
 
 
-    public double[][] getP0() {
-        calcP0();
-        return P0;
+    public double[][][] getP1() {
+        calculateP1();
+        return P1;
     }
 
 
@@ -150,7 +158,9 @@ public class P0System extends CalculationNode {
     @Override
     protected void store() {
         for (int i = 0; i < nTypes; i++) {
-            System.arraycopy(P0[i], 0, storedP0[i], 0, nSteps);
+            for (int j = 0; j < nTypes; i++) {
+                System.arraycopy(P1[i][j], 0, storedP1[i][j], 0, nSteps);
+            }
         }
         super.store();
     }
@@ -158,10 +168,10 @@ public class P0System extends CalculationNode {
 
     @Override
     protected void restore() {
-        double[][] tmp;
-        tmp = P0;
-        P0 = storedP0;
-        storedP0 = tmp;
+        double[][][] tmp;
+        tmp = P1;
+        P1 = storedP1;
+        storedP1 = tmp;
         super.restore();
     }
 
