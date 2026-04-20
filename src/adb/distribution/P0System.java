@@ -113,7 +113,7 @@ public class P0System extends CalculationNode {
             }
 
             // compute error
-            err = Utils.getMatrixError(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;

@@ -268,7 +268,7 @@ public class MTLogLikelihood {
             }
 
             // compute error
-            err = Utils.getMatrixError(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;
@@ -339,7 +339,7 @@ public class MTLogLikelihood {
             }
 
             // compute error
-            err = Utils.getMatrixError3D(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;
@@ -442,7 +442,7 @@ public class MTLogLikelihood {
                         }
 
                         // compute error
-                        err = Utils.getMatrixError3D(X, Xi);
+                        err = Utils.getError(X, Xi);
 
                         // update
                         X = Xi;

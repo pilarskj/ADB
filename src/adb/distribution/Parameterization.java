@@ -75,7 +75,7 @@ public class Parameterization extends CalculationNode {
 
         // assert that parameters fall in the proper range
         lifetime.setLower(Math.max(lifetime.getLower(), 0.0));
-        shape.setLower(Math.max((double)shape.getLower(), 0));
+        shape.setLower(Math.max(((Number)shape.getLower()).doubleValue(), 0));
         death.setBounds(Math.max(death.getLower(), 0.0), Math.min(death.getUpper(), 1.0));
         sampling.setBounds(Math.max(sampling.getLower(), 0.0), Math.min(sampling.getUpper(), 1.0));
         symTransitions.setBounds(Math.max(symTransitions.getLower(), 0.0), Math.min(symTransitions.getUpper(), 1.0));

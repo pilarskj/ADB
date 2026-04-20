@@ -2,18 +2,19 @@ package adb.util;
 
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
-import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.transform.DftNormalization;
 import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Arrays;
 
 public class Utils {
 
     // Global tools for calculations
     public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-    public static EuclideanDistance l2distance = new EuclideanDistance();
     public static LinearInterpolator interpolator = new LinearInterpolator();
 
     public static TransformType TRANSFORM_FORWARD = TransformType.FORWARD;
@@ -131,61 +132,58 @@ public class Utils {
         }
     }
 
-    // TODO: Why L1? Maybe L2 would be better?
-    // Calculate the 1-(Manhattan)-distance between two matrices,
-    // which is the maximum absolute column sum of the matrices substracted element-wise
-    public static double getMatrixError(double[][] X, double[][] Y) {
-        int n = X.length; // number of rows
-        int m = X[0].length;  // number of columns
 
-        double maxColSum = 0;
-
-        // iterate through each column
-        for (int col = 0; col < m; col++) {
-            double colSum = 0;
-
-            // sum the absolute differences for this column
-            for (int row = 0; row < n; row++) {
-                colSum += Math.abs(X[row][col] - Y[row][col]);
-            }
-
-            // Update maxColumnSum if this column has a larger sum
-            if (colSum > maxColSum) {
-                maxColSum = colSum;
-            }
+    // Calculate L2 distance element-wise
+    public static double getError(double[] x, double[] y) {
+        int n = x.length;
+        double sum = 0;
+        for (int i = 0; i < n; i++) {
+            double diff = x[i] - y[i];
+            sum += diff * diff;
         }
-
-        return maxColSum;
+        return Math.sqrt(sum);
     }
 
+    public static double getError(double[][] X, double[][] Y) {
+        int n = X.length; // number of rows
+        int m = X[0].length;  // number of columns
+        double sum = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                double diff = X[i][j] - Y[i][j];
+                sum += diff * diff;
+            }
+        }
+        return Math.sqrt(sum);
+    }
 
-    // Calculating the L1 distance between two 3D arrays
-    public static double getMatrixError3D(double[][][] X, double[][][] Y){
+    public static double getError(double[][][] X, double[][][] Y){
         int n = X.length; // number of arrays
         int m = X[0].length;  // number of rows
         int o = X[0][0].length;  // number of columns
-
-        double maxSum = 0;
-
-        // iterate over arrays
+        double sum = 0;
         for (int i = 0; i < n; i++) {
-            double sum = 0;
-
-            // substract matrices element-wise
-            for (int row = 0; row < m; row++) {
-                for (int col = 0; col < o; col++) {
-                    // sum the absolute differences for each element
-                    sum += Math.abs(X[i][row][col] - Y[i][row][col]);
+            for (int j = 0; j < m; j++) {
+                for (int k = 0; k < o; k++) {
+                    double diff = X[i][j][k] - Y[i][j][k];
+                    sum += diff * diff;
                 }
             }
-
-            // update maxSum if this array has a larger sum
-            if (sum > maxSum) {
-                maxSum = sum;
-            }
         }
+        return Math.sqrt(sum);
+    }
 
-        return maxSum;
+
+    public static void saveArrays(double[] x, double[] y, int thin, String header, String fileName) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(fileName))) {
+            writer.println(header);
+
+            for (int i = 0; i < x.length; i += thin) {
+                writer.printf("%.6f,%.6f%n", x[i], y[i]);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

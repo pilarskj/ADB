@@ -2,7 +2,9 @@ package adb.distribution;
 
 import adb.tree.AnnotatedNode;
 import adb.tree.AnnotatedTree;
+import adb.tree.EventNode;
 import adb.util.Utils;
+
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
@@ -10,6 +12,7 @@ import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
+
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.distribution.GammaDistribution;
@@ -17,11 +20,13 @@ import org.apache.commons.math3.util.Pair;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 import static adb.util.Utils.TRANSFORM_FORWARD;
 import static adb.tree.AnnotatedNode.getType;
+import static org.apache.commons.math3.special.Gamma.logGamma;
 
 
 @Description("Likelihood of a tree under ADB model.")
@@ -41,7 +46,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     public Input<Boolean> conditionOnOriginInput =
             new Input<>("conditionOnOrigin", "condition on time since origin otherwise on root height (default true)", true);
     public Input<Boolean> approxInput =
-            new Input<>("approx", "approximate branch probabilities (default true)", true);
+            new Input<>("approx", "approximate branch probabilities (default false)", false);
     public Input<Boolean> useAnalyticalBDSolutionInput =
             new Input<>("useAnalyticalBDSolution", "use analytical solution if shape is 1 (default false)", false);
 
@@ -64,6 +69,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     int nTypes;
 
     // calculation nodes
+    HashMap<Integer, GammaDistribution> gammaDistributions;
     LifetimeDistributions lifetimeDistributions;
     P0System P0System;
     HashMap<Integer, UnivariateFunction> P0Map;
@@ -73,7 +79,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     HashMap<Pair<Integer,Integer>, UnivariateFunction> P1Map;
 
     // for approximation:
-    // use cashing to avoid creating a new GammaDistribution object with shape i*b for i=1,2,... in each iteration
+    // use cashing to avoid creating a new GammaDistribution object with shape i*b for i=1,2,...
     // create a map to store the distributions for each i (once needed) and re-use them
     // use a thread-safe and dynamic map
     ConcurrentHashMap<Integer, GammaDistribution> gammaCache = new ConcurrentHashMap<>();
@@ -155,6 +161,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         );
 
         if (!(tree instanceof AnnotatedTree)) { // TODO: or xml input tag?
+            P1System = new P1System();
             P1System.init(
                     parameterization,
                     lifetimeDistributions,
@@ -169,10 +176,33 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     @Override
     public double calculateTreeLogLikelihood(TreeInterface tree) {
 
-        double[][] P0 = P0System.getP0();
+        Double originTime = parameterization.getOriginTime();
+        int originType = parameterization.getOriginType();
+
+        // get root
+        Node root = tree.getRoot();
+        double rootHeight = tree.getRoot().getHeight();
+
+        // stop if tree origin is smaller than root height
+        if (originTime != null) {
+            if (rootHeight >= originTime) {
+                return Double.NEGATIVE_INFINITY;
+            }
+        }
+
         // stop if extinction is certain
-        if (P0[parameterization.getOriginType()][nSteps - 1] == 1.0) {
+        double[][] P0 = P0System.getP0();
+        if (P0[originType][nSteps - 1] == 1.0) {
             return Double.NEGATIVE_INFINITY;
+        }
+
+        // get distributions for various calculations
+        gammaDistributions = new HashMap<>();
+        for (int i = 0; i < nTypes; i++) {
+            double lifetime = parameterization.getLifetime(i);
+            double shape = parameterization.getShape(i);
+            double scale = lifetime / shape;
+            gammaDistributions.put(i, new GammaDistribution(shape, scale));
         }
 
         // extend time array to calculate probabilities of tiny branches
@@ -185,12 +215,18 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         for (int i = 0; i < nTypes; i++) {
             double[] extP0 = new double[nSteps + 1];
             extP0[0] = 1 - parameterization.getSampling(i);
-            System.arraycopy(extP0, 0, P0[i], 1, nSteps);
+            System.arraycopy(P0[i], 0, extP0, 1, nSteps);
             UnivariateFunction function = Utils.interpolator.interpolate(extTimeArray, extP0);
             P0Map.put(i, function);
         }
 
-        if (!(tree instanceof AnnotatedTree)) {
+        double logL;
+
+        if (tree instanceof AnnotatedTree) {
+
+            logL = 0; // TODO
+
+        } else {
             double[][][] P1 = P1System.getP1();
 
             // extend and interpolate P1
@@ -199,16 +235,32 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
                 for (int j = 0; j < nTypes; j++) {
                     double[] extP1 = new double[nSteps + 1];
                     if (i == j) { extP1[0] = parameterization.getSampling(i); } else { extP1[0] = 0; }
-                    System.arraycopy(extP1, 0, P1[i][j], 1, nSteps);
+                    System.arraycopy(P1[i][j], 0, extP1, 1, nSteps);
                     UnivariateFunction function = Utils.interpolator.interpolate(extTimeArray, extP1);
                     P1Map.put(new Pair<>(i, j), function);
                 }
             }
         }
 
-        // TODO: Tree likelihood comes here!
+        // calculate tree factor
+        int nTips = tree.getLeafNodeCount();
+        double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
 
-        return 0;
+        if (conditionOnOrigin) {
+            double[] likelihood = calculateSubtreeLikelihood(root, rootHeight, originTime);
+            logL = -Math.log(1 - P0[originType][nSteps - 1]) + Math.log(likelihood[originType]);
+
+        } else {
+            Node leftSubtree = root.getLeft();
+            Node rightSubtree = root.getRight();
+            logL = -2 * Math.log(1 - P0[getType(root)][nSteps - 1]) +
+                    Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight)[getType(root)]) +
+                    Math.log(calculateSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), rootHeight)[getType(root)]);
+        }
+
+        logL = treeFactor + logL;
+
+        return logL;
     }
 
 
@@ -221,11 +273,13 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         // upstream branch
         double[][] branchDensity = calculateNodeLikelihood(node, start, end);
 
+        // at tips
         if (node.isLeaf()) {
             for (int i = 0; i < nTypes; i++) {
                 likelihood[i] = branchDensity[i][type];
             }
 
+        // recursion bottom-up
         } else {
             Node leftChild = node.getLeft();
             Node rightChild = node.getRight();
@@ -251,33 +305,121 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     }
 
 
+    private double calculateAnnotatedSubtreeLikelihood(AnnotatedNode node, double start, double end) {
+
+        double likelihood;
+
+        // upstream branch
+        double branchDensity = calculateAnnotatedNodeLikelihood(node, start, end);
+
+        // at tips
+        if (node.isLeaf()) {
+            likelihood = branchDensity;
+
+        // recursion bottom-up
+        } else {
+            int nodeType = node.getType();
+            List<EventNode> children = node.getChildEvents(0);
+            EventNode left = children.get(0);
+            EventNode right = children.get(1);
+            int leftType = left.getType();
+            int rightType = right.getType();
+
+            AnnotatedNode leftSubtree = (AnnotatedNode) node.getLeft();
+            AnnotatedNode rightSubtree = (AnnotatedNode) node.getRight();
+
+            double factor;
+            if (leftType == nodeType && rightType == nodeType) { // symmetric division
+                factor = parameterization.getSymTransition(nodeType, leftType);
+            } else if (leftType == nodeType && rightType != nodeType) { // asymmetric division
+                factor = 0.5 * parameterization.getAsymTransition(nodeType, rightType);
+            } else if (leftType != nodeType && rightType == nodeType) {
+                factor = 0.5 * parameterization.getAsymTransition(nodeType, leftType);
+            } else { // impossible transition
+                return Double.NEGATIVE_INFINITY;
+            }
+
+            likelihood = branchDensity * factor *
+                    calculateAnnotatedNodeLikelihood(leftSubtree, leftSubtree.getHeight(), node.getHeight()) *
+                    calculateAnnotatedNodeLikelihood(rightSubtree, rightSubtree.getHeight(), node.getHeight());
+        }
+
+        return likelihood;
+    }
+
+
+    // calculate the density of the branch upstream of an annotated node
+    private double calculateAnnotatedNodeLikelihood(AnnotatedNode node, double start, double end) {
+
+        List<EventNode> events = node.getEvents();
+        assert events.get(0).getHeight() == start;
+
+        // initial event
+        int ix = events.size() - 1;
+        EventNode event = events.get(ix);
+        double likelihood = calculateSegmentDensity(event.getType(), event.getHeight(), end);
+
+        while (ix > 0) {
+            ix -= 1;
+            EventNode next = events.get(ix);
+            double e = event.getHeight();
+            double s = next.getHeight();
+            int i = event.getType();
+            int j = next.getType();
+
+            double nextLik = calculateSegmentDensity(j, s, e);
+            if (i == j) {
+                double sum = parameterization.getSymTransition(i, i) * P0Map.get(i).value(e);
+                for (int k = 0; k < nTypes; k++) {
+                    sum += parameterization.getAsymTransition(i, k) * P0Map.get(k).value(e);
+                }
+                likelihood *= sum * nextLik;
+            } else {
+                likelihood *= (parameterization.getSymTransition(i, j) * P0Map.get(j).value(e) +
+                        parameterization.getAsymTransition(i, j) * P0Map.get(i).value(e)) *
+                        nextLik;
+            }
+
+            event = next;
+        }
+
+        return likelihood;
+    }
+
+
+    private double calculateSegmentDensity(int type, double start, double end) {
+        double density;
+        if (start == 0.0) {
+            density = parameterization.getSampling(type) * (1 - gammaDistributions.get(type).cumulativeProbability(end));
+        } else {
+            density = (1 - parameterization.getDeath(type)) * Math.exp(gammaDistributions.get(type).logDensity(end - start));
+        }
+        return density;
+    }
+
+
     // calculate the density of the branch upstream of node
     private double[][] calculateNodeLikelihood(Node node, double start, double end) {
 
         double[][] likelihood = new double[nTypes][nTypes];
 
-        if (node instanceof AnnotatedNode) {
-            return likelihood; // TODO: branch segments
-
-        } else {
-            if (node.isLeaf()) { // tip - sampling event
-                assert start == 0.0;
-                for (int i = 0; i < nTypes; i++) {
-                    for (int j = 0; j < nTypes; j++) {
-                        likelihood[i][j] = P1Map.get(new Pair<>(i, j)).value(end);
-                    }
-                }
-
-            } else {
-                if (approx) {
-                    likelihood[0][0] = approximateBranchDensity(start, end);
-                } else {
-                    likelihood = calculateBranchDensity(start, end);
+        if (node.isLeaf()) { // tip - sampling event
+            assert start == 0.0;
+            for (int i = 0; i < nTypes; i++) {
+                for (int j = 0; j < nTypes; j++) {
+                    likelihood[i][j] = P1Map.get(new Pair<>(i, j)).value(end);
                 }
             }
 
-            return likelihood;
+        } else {
+            if (approx) {
+                likelihood[0][0] = approximateBranchDensity(start, end);
+            } else {
+                likelihood = calculateBranchDensity(start, end);
+            }
         }
+
+        return likelihood;
     }
 
 
@@ -303,11 +445,8 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         IntStream.range(0, nTypes)
                 .parallel()
                 .forEach(i -> {
+                    GammaDistribution gammaDist = gammaDistributions.get(i);
                     double[] pdf = new double[nSteps];
-                    double lifetime = parameterization.getLifetime(i);
-                    double shape = parameterization.getShape(i);
-                    double scale = lifetime / shape;
-                    GammaDistribution gammaDist = new GammaDistribution(shape, scale);
                     for (int w = 0; w < nSteps; w++) {
                         pdf[w] = Math.exp(gammaDist.logDensity(ageSeq[w])); // get density
                         P0[i][w] = P0Map.get(i).value(seq[w]); // extrapolate P0
@@ -348,13 +487,13 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
                     // sum
                     for (int w = 0; w < nSteps; w++) {
-                        Xi[w][i][j] = X0[w][i][j] + 2 * (1 - parameterization.getDeath(i)) * I[w];
+                        Xi[i][j][w] = X0[i][j][w] + 2 * (1 - parameterization.getDeath(i)) * I[w];
                     }
                 }
             }
 
             // compute error
-            err = Utils.getMatrixError3D(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;

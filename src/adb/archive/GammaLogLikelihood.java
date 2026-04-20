@@ -171,7 +171,7 @@ public class GammaLogLikelihood {
             }
 
             // compute error
-            err = Utils.l2distance.compute(Xi, X);
+            err = Utils.getError(Xi, X);
 
             // update
             X = Xi;
@@ -224,7 +224,7 @@ public class GammaLogLikelihood {
             }
 
             // compute error
-            err = Utils.l2distance.compute(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;
@@ -312,7 +312,7 @@ public class GammaLogLikelihood {
                         }
 
                         // compute error
-                        err = Utils.l2distance.compute(X, Xi);
+                        err = Utils.getError(X, Xi);
 
                         // update
                         X = Xi;

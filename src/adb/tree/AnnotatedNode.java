@@ -46,7 +46,11 @@ public class AnnotatedNode extends Node {
         return events.get(idx);
     }
 
-    public int getType() {
+    public int getInitialType() { // past type
+        return events.get(events.size() - 1).type;
+    }
+
+    public int getType() { // present type
         return events.get(0).type;
     }
 
@@ -69,7 +73,7 @@ public class AnnotatedNode extends Node {
 
     public void removeEvent(int idx) {
         if (idx >= events.size())
-            throw new IllegalArgumentException("Index to removeChange() out of range.");
+            throw new IllegalArgumentException("Index to removeEvent() out of range.");
         events.remove(idx);
     }
 
@@ -89,6 +93,29 @@ public class AnnotatedNode extends Node {
                 return parent.events.get(0); // predecessor is a branching node
             }
         }
+    }
+
+    public List<EventNode> getChildEvents(int idx) { // get next event(s)
+        List<EventNode> children = new ArrayList<>();
+        if (idx > 0) {
+            // one child (hidden node)
+            children.add(0, events.get(idx - 1));
+        } else {
+            if (this.isLeaf()) {
+                // no children
+                return null;
+            } else {
+                // two children
+                AnnotatedNode left = (AnnotatedNode) this.getLeft();
+                List<EventNode> leftEvents = left.getEvents();
+                children.add(0, leftEvents.get(leftEvents.size() - 1));
+
+                AnnotatedNode right = (AnnotatedNode) this.getRight();
+                List<EventNode> rightEvents = right.getEvents();
+                children.add(1, rightEvents.get(rightEvents.size() - 1));
+            }
+        }
+        return children;
     }
 
     public double[] getWaitingTimes() { // if operating on trees without stem branch

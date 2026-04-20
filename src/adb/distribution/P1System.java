@@ -109,7 +109,7 @@ public class P1System extends CalculationNode {
                     for (int w = 0; w < nSteps; w++) { // multiply elementwise on times
                         for (int k = 0; k < nTypes; k++) { // sum over all types k
                             y[w] += parameterization.getSymTransition(i, k) * P0[k][w] * X[k][j][w] +
-                                    0.5 * parameterization.getSymTransition(i, k) * (P0[i][w] * X[k][j][w] + P0[k][w] * X[i][j][w]);
+                                    0.5 * parameterization.getAsymTransition(i, k) * (P0[i][w] * X[k][j][w] + P0[k][w] * X[i][j][w]);
                         }
                     }
 
@@ -124,7 +124,7 @@ public class P1System extends CalculationNode {
             }
 
             // compute error
-            err = Utils.getMatrixError3D(X, Xi);
+            err = Utils.getError(X, Xi);
 
             // update
             X = Xi;
