@@ -30,7 +30,6 @@ import static org.apache.commons.math3.special.Gamma.logGamma;
 
 
 @Description("Likelihood of a tree under ADB model.")
-// TODO: assert tree factors for multi-type and annotated trees
 public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
     public Input<Parameterization> parameterizationInput =
@@ -190,6 +189,8 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             }
         }
 
+        // TODO: add single-type BD analytical solution
+
         // stop if extinction is certain
         double[][] P0 = P0System.getP0();
         if (P0[originType][nSteps - 1] == 1.0) {
@@ -220,13 +221,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             P0Map.put(i, function);
         }
 
-        double logL;
-
-        if (tree instanceof AnnotatedTree) {
-
-            logL = 0; // TODO
-
-        } else {
+        if (!(tree instanceof AnnotatedTree)) {
             double[][][] P1 = P1System.getP1();
 
             // extend and interpolate P1
@@ -246,20 +241,33 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         int nTips = tree.getLeafNodeCount();
         double treeFactor = (nTips - 1) * Math.log(2) - logGamma(nTips + 1); // 2^(n-1)/n!
 
+        double conditionFactor;
+        double logL;
+
         if (conditionOnOrigin) {
-            double[] likelihood = calculateSubtreeLikelihood(root, rootHeight, originTime);
-            logL = -Math.log(1 - P0[originType][nSteps - 1]) + Math.log(likelihood[originType]);
+            conditionFactor = -Math.log(1 - P0[originType][nSteps - 1]);
+
+            if (tree instanceof AnnotatedTree) {
+                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) root, rootHeight, originTime));
+            } else {
+                logL = Math.log(calculateSubtreeLikelihood(root, rootHeight, originTime)[originType]);
+            }
 
         } else {
+            conditionFactor = -2 * Math.log(1 - P0[getType(root)][nSteps - 1]);
+
             Node leftSubtree = root.getLeft();
             Node rightSubtree = root.getRight();
-            logL = -2 * Math.log(1 - P0[getType(root)][nSteps - 1]) +
-                    Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight)[getType(root)]) +
-                    Math.log(calculateSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), rootHeight)[getType(root)]);
+            if (tree instanceof AnnotatedTree) {
+                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) leftSubtree, leftSubtree.getHeight(), rootHeight)) +
+                        Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) rightSubtree, rightSubtree.getHeight(), rootHeight));
+            } else {
+                logL = Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight)[getType(root)]) +
+                        Math.log(calculateSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), rootHeight)[getType(root)]);
+            }
         }
 
-        logL = treeFactor + logL;
-
+        logL = treeFactor + conditionFactor + logL;
         return logL;
     }
 

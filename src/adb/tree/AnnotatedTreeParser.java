@@ -28,7 +28,7 @@ public class AnnotatedTreeParser extends AnnotatedTree implements StateNodeIniti
             "factor used to multiply internal node heights during paring.", 1.0);
 
 
-    AnnotatedTree annotatedTree; // TODO: change to "in-place" conversion
+    // AnnotatedTree annotatedTree; // TODO: change to "in-place" conversion
 
 
     public AnnotatedTreeParser() { }
@@ -56,17 +56,17 @@ public class AnnotatedTreeParser extends AnnotatedTree implements StateNodeIniti
         }
 
         if (containsEvents) {
-            annotatedTree = convertEventTree(tree);
+            convertEventTree(tree);
         } else {
             // tree contains only branching nodes and tips
-            annotatedTree = convertBranchingTree(tree);
+            convertBranchingTree(tree);
         }
 
-        root = annotatedTree.getRoot();
+        /* root = annotatedTree.getRoot();
         nodeCount = annotatedTree.getNodeCount();
         internalNodeCount = annotatedTree.getInternalNodeCount();
         leafNodeCount = annotatedTree.getLeafNodeCount();
-        initArrays();
+        initArrays(); */
     }
 
 

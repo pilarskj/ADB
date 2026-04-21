@@ -65,6 +65,7 @@ public class P1System extends CalculationNode {
         calculateP1();
     }
 
+
     private void calculateP1() {
 
         if (!dirty) return;
@@ -78,7 +79,6 @@ public class P1System extends CalculationNode {
         }
 
         double[][] P0 = P0System.getP0();
-
 
         // notation: it = iteration, w = integration variable (time), i,j,k = types
         // initialize matrix
@@ -96,7 +96,6 @@ public class P1System extends CalculationNode {
         double err = 1;
         int it = 0;
         double[][][] X = X0;
-
 
         // iterate
         while (err > tol && it < maxIt) {
@@ -135,9 +134,8 @@ public class P1System extends CalculationNode {
             System.err.printf("calculateP1 Warning: max iterations reached with error: %.2f%n", err);
         }
 
-        // set state
+        // set final
         P1 = X;
-
         dirty = false;
     }
 

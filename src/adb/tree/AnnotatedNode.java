@@ -22,6 +22,7 @@ public class AnnotatedNode extends Node {
     protected List<EventNode> events = new ArrayList<>();
 
 
+    // TODO: necessary?
     public AnnotatedNode() {
         super();
         /* // initialize with this node being the only event
@@ -29,6 +30,7 @@ public class AnnotatedNode extends Node {
         EventNode branchingEvent = new EventNode(getType(this), this.height);
         this.events.add(branchingEvent); */
     }
+
 
     public List<EventNode> getEvents() {
         return events;
@@ -140,6 +142,75 @@ public class AnnotatedNode extends Node {
             }
         }
         return times;
+    }
+
+
+    // TODO: move? change input types to parameters?
+    // draw events (without type transitions) along the upstream branch
+    public void drawEvents(double lifetime, double shape) {
+        events.clear();
+        events.add(new EventNode(getType(this), this.getHeight()));
+
+        if (this.isLeaf()) {
+            double t = this.getParent().getHeight();
+            // work in progress
+        }
+    }
+
+
+    /**
+     * ************************ *
+     * Methods ported from Node *
+     * ************************ *
+     */
+
+    /**
+     * Assign values from a tree in array representation *
+     */
+    @Override
+    public void assignFrom(Node[] nodes, final Node node) {
+        height = node.getHeight();
+        labelNr = node.getNr();
+        metaDataString = node.metaDataString;
+        parent = null;
+        ID = node.getID();
+
+        AnnotatedNode aNode = (AnnotatedNode)node;
+        events.clear();
+        events.addAll(aNode.events);
+
+        if (node.getLeft() != null) {
+            setLeft(nodes[node.getLeft().getNr()]);
+            getLeft().assignFrom(nodes, node.getLeft());
+            getLeft().setParent(this);
+            if (node.getRight() != null) {
+                setRight(nodes[node.getRight().getNr()]);
+                getRight().assignFrom(nodes, node.getRight());
+                getRight().setParent(this);
+            }
+        }
+    }
+
+    /**
+     * (Deep) copy of node *
+     */
+    public AnnotatedNode copy() {
+        AnnotatedNode node = new AnnotatedNode();
+        node.height = height;
+        node.labelNr = labelNr;
+        node.metaDataString = metaDataString;
+        node.parent = null;
+        node.ID = ID;
+        node.events.addAll(events);
+        if (getLeft()!=null) {
+            node.setLeft(getLeft().copy());
+            node.getLeft().setParent(node);
+            if (getRight()!=null) {
+                node.setRight(getRight().copy());
+                node.getRight().setParent(node);
+            }
+        }
+        return node;
     }
 
 }

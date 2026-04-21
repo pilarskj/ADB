@@ -61,7 +61,6 @@ public class P0System extends CalculationNode {
     }
 
 
-    // TODO: adapt function for calculating the extinction probability
     private void calcP0() {
 
         if (!dirty) return;
@@ -124,12 +123,8 @@ public class P0System extends CalculationNode {
             System.err.printf("calculateP0 Warning: max iterations reached with error: %.2f%n", err);
         }
 
-        // set state
+        // set final
         P0 = X;
-        //for (int i = 0; i < nTypes; i++) {
-        //    System.arraycopy(P0[i], 0, X[i], 0, nSteps);
-        //}
-
         dirty = false;
     }
 
@@ -164,6 +159,5 @@ public class P0System extends CalculationNode {
         storedP0 = tmp;
         super.restore();
     }
-
 
 }
