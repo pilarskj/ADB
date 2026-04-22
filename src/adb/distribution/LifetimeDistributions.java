@@ -3,6 +3,7 @@ package adb.distribution;
 import adb.util.Utils;
 import beast.base.core.Input;
 import beast.base.inference.CalculationNode;
+import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.Parameter;
 import beast.base.inference.parameter.RealParameter;
 import org.apache.commons.math3.complex.Complex;
@@ -32,8 +33,6 @@ public class LifetimeDistributions extends CalculationNode {
     // for identifying dirty indices
     boolean dirty;
     BitSet dirtyIndices = new BitSet();
-    double[] storedLifetimes;
-    double[] storedShapes;
 
     // output
     LifetimeDistribution[] lifetimeDistributions;
@@ -83,8 +82,6 @@ public class LifetimeDistributions extends CalculationNode {
 
         lifetimeDistributions = new LifetimeDistribution[nTypes];
         storedLifetimeDistributions = new LifetimeDistribution[nTypes];
-        storedLifetimes = lifetimeParameter.getDoubleValues();
-        storedShapes = shapeParameter.getDoubleValues();
 
         // get all initial distributions
         dirty = true;
@@ -116,8 +113,8 @@ public class LifetimeDistributions extends CalculationNode {
 
 
     private void updateLifetimeDistribution(int x) {
-        double lifetime = (double)lifetimeParameter.getArrayValue(x);
-        double shape = (double)shapeParameter.getArrayValue(x);
+        double lifetime = lifetimeParameter.getArrayValue(x);
+        double shape = shapeParameter.getArrayValue(x);
 
         // initialize distribution
         double scale = lifetime / shape;
@@ -148,11 +145,18 @@ public class LifetimeDistributions extends CalculationNode {
 
     @Override
     protected boolean requiresRecalculation() {
-        double[] lifetimes = lifetimeParameter.getDoubleValues();
-        double[] shapes = shapeParameter.getDoubleValues();
         for (int i = 0; i < nTypes; i++) {
-            if (lifetimes[i] != storedLifetimes[i] || shapes[i] != storedShapes[i]) {
+            if (lifetimeParameter.isDirty(i)) { // Note: for some reason shapeParameter.isDirty(i) does not work!
                 dirtyIndices.set(i); // mark this index as needing a store/restore
+            }
+            if (shapeParameter instanceof RealParameter) {
+                if (((RealParameter)shapeParameter).isDirty(i)) {
+                    dirtyIndices.set(i);
+                }
+            } else if (shapeParameter instanceof IntegerParameter) {
+                if (((IntegerParameter)shapeParameter).isDirty(i)) {
+                    dirtyIndices.set(i);
+                }
             }
         }
         dirty = true;
@@ -165,8 +169,6 @@ public class LifetimeDistributions extends CalculationNode {
         // only iterate over bits that are set to true
         for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
             storedLifetimeDistributions[i].copyFrom(lifetimeDistributions[i]);
-            storedLifetimes[i] = lifetimeParameter.getArrayValue(i);
-            storedShapes[i] = shapeParameter.getArrayValue(i);
         }
         super.store();
     }
@@ -176,8 +178,6 @@ public class LifetimeDistributions extends CalculationNode {
     protected void restore() {
         for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
             lifetimeDistributions[i].copyFrom(storedLifetimeDistributions[i]);
-            storedLifetimes[i] = lifetimeParameter.getArrayValue(i);
-            storedShapes[i] = shapeParameter.getArrayValue(i);
         }
         dirtyIndices.clear();
         super.restore();

@@ -1,5 +1,6 @@
 package adb.util;
 
+import beast.base.util.Randomizer;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -173,6 +174,32 @@ public class Utils {
         return Math.sqrt(sum);
     }
 
+    // https://stats.stackexchange.com/questions/69210/drawing-from-dirichlet-distribution
+    public static double[] distributeDirichlet(double[] x, double alpha){
+        int n = x.length;
+        double sumX = 0;
+        for (int i = 0; i < n; i++) {
+            sumX += x[i];
+        }
+
+        // draw n independent random samples from Gamma distribution
+        double[] y = new double[n];
+        double sumY = 0;
+        for (int i = 0; i < n; i++) {
+            y[i] = Randomizer.nextGamma(alpha, 1);
+            sumY += y[i];
+        }
+
+        // divide by the sum to obtain a sample from the Dirichlet distribution
+        // and multiply the original value in array with the sampled factor
+        double[] p = new double[n];
+        for (int i = 0; i < n; i++) {
+            p[i] = y[i] / sumY;
+            x[i] = p[i] * sumX;
+        }
+
+        return x;
+    }
 
     public static void saveArrays(double[] x, double[] y, int thin, String header, String fileName) {
         try (PrintWriter writer = new PrintWriter(new FileWriter(fileName))) {

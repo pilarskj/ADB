@@ -1,7 +1,15 @@
 package adb.tree;
 
+import adb.distribution.Parameterization;
+import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
+import beast.base.inference.parameter.IntegerParameter;
+import beast.base.inference.parameter.RealParameter;
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+
+import static adb.util.Utils.distributeDirichlet;
 
 public class AnnotatedTreeTest {
 
@@ -25,5 +33,30 @@ public class AnnotatedTreeTest {
         parser.initByName("newick", newick);
 
         System.out.print(parser);
+    }
+
+    @Test
+    public void testDirichlet() {
+        double[] x = {4, 4, 4};
+        double alpha = 5;
+        double[] res = distributeDirichlet(x, alpha);
+        System.out.println(Arrays.toString(res));
+    }
+
+    @Test
+    public void testInitialisation() throws Exception {
+
+        Tree tree = new TreeParser("((1:43.08956348,17:43.08956348):7.807559093,(8:17.26568023,10:17.26568023):33.63144235):8.415882985;", true);
+        Parameterization model = new Parameterization();
+        model.initByName("nTypes", 1,
+                "lifetime", new RealParameter("10"),
+                "shape", new IntegerParameter("20"),
+                "death", new RealParameter("0.1"),
+                "sampling", new RealParameter("0.1"),
+                "originTime", 70.0);
+
+        AnnotatedTree aTree = new AnnotatedTreeInitialiser();
+        aTree.initByName("tree", tree, "parameterization", model);
+        System.out.println(aTree);
     }
 }

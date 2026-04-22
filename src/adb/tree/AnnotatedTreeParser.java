@@ -14,21 +14,14 @@ import java.util.List;
 @Description("Class to initialize an AnnotatedTree from newick tree with type metadata")
 public class AnnotatedTreeParser extends AnnotatedTree implements StateNodeInitialiser {
 
-    public Input<String> newickInput = new Input<>(
-            "newick",
-            "tree in newick format",
-            Input.Validate.REQUIRED);
+    public Input<String> newickInput =
+            new Input<>("newick", "tree in newick format", Input.Validate.REQUIRED);
 
-    public Input<Boolean> adjustTipHeightsInput = new Input<>(
-            "adjustTipHeights",
-            "adjust tip heights in tree? (default true)", true);
+    public Input<Boolean> adjustTipHeightsInput =
+            new Input<>("adjustTipHeights", "adjust tip heights in tree? (default true)", true);
 
-    public Input<Double> scaleInput = new Input<>(
-            "scale",
-            "factor used to multiply internal node heights during paring.", 1.0);
-
-
-    // AnnotatedTree annotatedTree; // TODO: change to "in-place" conversion
+    public Input<Double> scaleInput =
+            new Input<>("scale", "factor used to multiply internal node heights during parsing", 1.0);
 
 
     public AnnotatedTreeParser() { }
@@ -56,17 +49,12 @@ public class AnnotatedTreeParser extends AnnotatedTree implements StateNodeIniti
         }
 
         if (containsEvents) {
+            // tree contains also single-descendant (hidden) nodes
             convertEventTree(tree);
         } else {
             // tree contains only branching nodes and tips
             convertBranchingTree(tree);
         }
-
-        /* root = annotatedTree.getRoot();
-        nodeCount = annotatedTree.getNodeCount();
-        internalNodeCount = annotatedTree.getInternalNodeCount();
-        leafNodeCount = annotatedTree.getLeafNodeCount();
-        initArrays(); */
     }
 
 

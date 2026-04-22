@@ -44,6 +44,38 @@ public class Parameterization extends CalculationNode {
     protected Double originTime;
     protected Integer originType;
 
+    TypeMap[] typeMap;
+    TypeMap[] storedTypeMap;
+
+
+    // Internal class
+    public class TypeMap {
+        int type;
+        boolean[] progenitors;
+        boolean[] descendants;
+
+        public TypeMap(int type, boolean[] progenitors, boolean[] descendants) {
+            this.type = type;
+            this.progenitors = progenitors;
+            this.descendants = descendants;
+        }
+
+        public void copyFrom(TypeMap other) {
+            // deep copy of all parameters
+            this.type = other.type;
+            System.arraycopy(other.progenitors, 0, this.progenitors, 0, other.progenitors.length);
+            System.arraycopy(other.descendants, 0, this.descendants, 0, other.descendants.length);
+        }
+
+        public boolean hasProgenitor(int type) {
+            return progenitors[type];
+        }
+
+        public boolean hasDescendant(int type) {
+            return descendants[type];
+        }
+    }
+
 
     @Override
     public void initAndValidate() {
@@ -144,6 +176,42 @@ public class Parameterization extends CalculationNode {
         return originType;
     }
 
+    public TypeMap getTypeMap(int i) {
+        if (symTransitions.somethingIsDirty() || asymTransitions.somethingIsDirty()) {
+            updateTypeMap(i);
+        }
+        return typeMap[i];
+    }
 
+    private void updateTypeMap(int i) {
+        boolean[] progenitors = new boolean[this.nTypes];
+        boolean[] descendants = new boolean[this.nTypes];
+        for (int j = 0; j < nTypes; i++) {
+            if (this.getSymTransition(j, i) > 0 || this.getAsymTransition(j, i) > 0) {
+                progenitors[i] = true;
+            }
+            if (this.getSymTransition(i, j) > 0 || this.getAsymTransition(i, j) > 0) {
+                descendants[i] = true;
+            }
+        }
+    }
+
+    @Override
+    protected void store() {
+        for (int i = 0; i < nTypes; i++) {
+            storedTypeMap[i].copyFrom(typeMap[i]);
+        }
+        super.store();
+    }
+
+
+    @Override
+    protected void restore() {
+        TypeMap[] tmp;
+        tmp = typeMap;
+        typeMap = storedTypeMap;
+        storedTypeMap = tmp;
+        super.restore();
+    }
 
 }

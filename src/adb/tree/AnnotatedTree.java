@@ -1,9 +1,11 @@
 package adb.tree;
 
 import beast.base.core.Description;
+import beast.base.core.Log;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.StateNode;
+import beast.base.inference.StateNodeInitialiser;
 
 import java.util.*;
 
@@ -25,6 +27,88 @@ public class AnnotatedTree extends Tree {
         internalNodeCount = root.getInternalNodeCount();
         leafNodeCount = root.getLeafNodeCount();
         initArrays();
+    }
+
+
+    @Override
+    public void initAndValidate() {
+
+        if (m_initial.get() != null && !(this instanceof StateNodeInitialiser)) {
+
+            if (!(m_initial.get() instanceof AnnotatedTree)) {
+                throw new IllegalArgumentException("Attempted to initialise "
+                        + "multi-type tree with regular tree object.");
+            }
+
+            AnnotatedTree other = (AnnotatedTree)m_initial.get();
+            root = other.root.copy();
+            nodeCount = other.nodeCount;
+            internalNodeCount = other.internalNodeCount;
+            leafNodeCount = other.leafNodeCount;
+        }
+
+        if (nodeCount < 0) { // if only taxa provided
+            if (m_taxonset.get() != null) {
+                // make a caterpillar
+                List<String> sTaxa = m_taxonset.get().asStringList();
+                Node left = new AnnotatedNode();
+                left.setNr(0);
+                left.setHeight(0);
+                left.setID(sTaxa.get(0));
+                for (int i = 1; i < sTaxa.size(); i++) {
+                    Node right = new AnnotatedNode();
+                    right.setNr(i);
+                    right.setHeight(0);
+                    right.setID(sTaxa.get(i));
+                    Node parent = new AnnotatedNode();
+                    parent.setNr(sTaxa.size() + i - 1);
+                    parent.setHeight(i);
+                    left.setParent(parent);
+                    parent.setLeft(left);
+                    right.setParent(parent);
+                    parent.setRight(right);
+                    left = parent;
+                }
+                root = left;
+                leafNodeCount = sTaxa.size();
+                nodeCount = leafNodeCount * 2 - 1;
+                internalNodeCount = leafNodeCount - 1;
+
+            } else {
+                // make dummy tree with a single root node
+                root = new AnnotatedNode();
+                root.setNr(0);
+                root.setTree(this);
+                nodeCount = 1;
+                internalNodeCount = 0;
+                leafNodeCount = 1;
+            }
+        }
+
+        if (nodeCount >= 0) {
+            initArrays();
+        }
+
+        processTraits(m_traitList.get());
+
+        // ensure tree is compatible with traits
+        if (hasDateTrait()) {
+            adjustTreeNodeHeights(root);
+        }
+
+        // ensure all nodes have their taxon names set up
+        String[] taxa = getTaxaNames();
+        for (int i = 0; i < getNodeCount() && i < taxa.length; i++) {
+            if(taxa[i] != null) {
+                if (m_nodes[i] == null) {
+                    Log.warning("WARNING: Expected a node for taxon " + taxa[i] + " but did not find one in the expected location in the m_nodes array");
+                } else if(m_nodes[i].getID() == null) {
+                    m_nodes[i].setID(taxa[i]);
+                }
+            }
+        }
+
+        // TODO: check types in traits here?
     }
 
 

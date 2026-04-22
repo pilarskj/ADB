@@ -1,5 +1,6 @@
 package adb.tree;
 
+import adb.util.Utils;
 import beast.base.core.Description;
 import beast.base.evolution.tree.Node;
 
@@ -22,22 +23,19 @@ public class AnnotatedNode extends Node {
     protected List<EventNode> events = new ArrayList<>();
 
 
-    // TODO: necessary?
-    public AnnotatedNode() {
-        super();
-        /* // initialize with this node being the only event
-        this.events = new ArrayList<>();
-        EventNode branchingEvent = new EventNode(getType(this), this.height);
-        this.events.add(branchingEvent); */
-    }
-
-
     public List<EventNode> getEvents() {
         return events;
     }
 
     public void setEvents(List<EventNode> events) {
         this.events = events;
+    }
+
+    public void clearEvents() {
+        events.clear();
+        // restore event list with the node itself being the only event
+        EventNode branchingEvent = new EventNode(getType(this), this.height);
+        events.add(branchingEvent);
     }
 
     public int getEventCount() {
@@ -56,6 +54,10 @@ public class AnnotatedNode extends Node {
         return events.get(0).type;
     }
 
+    public void setType(int type) {
+        events.set(0, new EventNode(type, this.height));
+    }
+
     // get type of any Node // TODO: make more generic?
     public static int getType(Node node) {
         int type;
@@ -67,11 +69,20 @@ public class AnnotatedNode extends Node {
         return type;
     }
 
-    public void addEvent(EventNode event) {
-        int idx = Collections.binarySearch(events, event, comparator);
-        if (idx < 0) { idx = -(idx + 1); } // convert to insertion point
+    public void addEvent(EventNode event, boolean append) {
+        if (append) { // append at end
+            events.add(event);
+        } else { // find the correct spot
+            int idx = Collections.binarySearch(events, event, comparator);
+            if (idx < 0) { idx = -(idx + 1); } // convert to insertion point
+            events.add(idx, event);
+        }
+    }
+
+    public void addEvent(EventNode event, int idx) { // add at given position, remaining entries will be shifted +1
         events.add(idx, event);
     }
+
 
     public void removeEvent(int idx) {
         if (idx >= events.size())
@@ -123,7 +134,7 @@ public class AnnotatedNode extends Node {
     public double[] getWaitingTimes() { // if operating on trees without stem branch
         double[] times = new double[events.size()];
         for (int i = 0; i < times.length; i++) {
-            if (this.getParentEvent(i) == null) { // this should never happen
+            if (this.getParentEvent(i) == null) { // this only be true for the 0th event of the root
                 times[i] = 0;
             } else {
                 times[i] = this.getParentEvent(i).getHeight() - events.get(i).getHeight();
@@ -144,16 +155,17 @@ public class AnnotatedNode extends Node {
         return times;
     }
 
+    // re-distribute events according to Dirichlet distribution
+    public void distributeEvents(double alpha, double origin) {
+        double[] segmentLengths = this.getWaitingTimes(origin); // TODO: special option for stem branch?
+        double[] newSegmentLengths = Utils.distributeDirichlet(segmentLengths, alpha);
 
-    // TODO: move? change input types to parameters?
-    // draw events (without type transitions) along the upstream branch
-    public void drawEvents(double lifetime, double shape) {
-        events.clear();
-        events.add(new EventNode(getType(this), this.getHeight()));
-
-        if (this.isLeaf()) {
-            double t = this.getParent().getHeight();
-            // work in progress
+        double height = this.getHeight();
+        for (int i = 1; i < events.size(); i++) {
+            height = height + newSegmentLengths[i - 1];
+            EventNode event = events.get(i);
+            event.setHeight(height);
+            events.set(i, event);
         }
     }
 
