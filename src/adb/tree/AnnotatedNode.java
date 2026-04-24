@@ -140,7 +140,7 @@ public class AnnotatedNode extends Node {
         List<EventNode> children = new ArrayList<>();
         if (idx > 0) {
             // one child (hidden node)
-            children.add(0, events.get(idx - 1));
+            children.add(events.get(idx - 1));
         } else {
             if (this.isLeaf()) {
                 // no children
@@ -148,12 +148,10 @@ public class AnnotatedNode extends Node {
             } else {
                 // two children
                 AnnotatedNode left = (AnnotatedNode)getLeft();
-                List<EventNode> leftEvents = left.getEvents();
-                children.add(0, leftEvents.get(leftEvents.size() - 1));
+                children.add(left.getEvent(left.getEventCount() - 1));
 
                 AnnotatedNode right = (AnnotatedNode)getRight();
-                List<EventNode> rightEvents = right.getEvents();
-                children.add(1, rightEvents.get(rightEvents.size() - 1));
+                children.add(right.getEvent(right.getEventCount() - 1));
             }
         }
         return children;

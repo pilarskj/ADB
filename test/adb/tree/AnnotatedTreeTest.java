@@ -1,5 +1,6 @@
 package adb.tree;
 
+import adb.distribution.ADBTreeDistribution;
 import adb.distribution.Parameterization;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
@@ -27,10 +28,10 @@ public class AnnotatedTreeTest {
         String newick = "((((1[&type=0]:1.378074977,(11[&type=1]:0.9265429956)[&type=1]:0.4515319812)[&type=1]:0.5929298741)[&type=0]:2.088429726,(((3[&type=0]:0.4513672607)[&type=1]:1.262419189,((6[&type=0]:0.05632331623)[&type=1]:0.7255498933)[&type=1]:0.9319132401)[&type=1]:0.2056271944)[&type=0]:2.140020933)[&type=0]:2.073580344)[&type=0]:1.866985079;";
 
         // parse tree
-        TreeParser parser = new TreeParser();
-        parser.initByName("newick",newick, "adjustTipHeights", true, "IsLabelledNewick", true);
-        //AnnotatedTreeParser parser = new AnnotatedTreeParser();
-        //parser.initByName("newick", newick);
+        //TreeParser parser = new TreeParser();
+        //parser.initByName("newick",newick, "adjustTipHeights", true, "IsLabelledNewick", true);
+        AnnotatedTreeParser parser = new AnnotatedTreeParser();
+        parser.initByName("newick", newick);
 
         System.out.print(parser);
     }
@@ -79,10 +80,18 @@ public class AnnotatedTreeTest {
                 "originTime", 10.0);
 
         AnnotatedTree aTree = new AnnotatedTreeInitialiser();
-        aTree.initByName("tree", tree, "parameterization", model);
+        aTree.initByName("tree", tree, "parameterization", model, "scale", 0.8);
         System.out.println(aTree);
 
         tree = aTree.convertAnnotatedTree(true);
         System.out.println(tree);
+
+        // calculate tree log-likelihood (check if not -Infinity)
+        ADBTreeDistribution distribution = new ADBTreeDistribution();
+        distribution.initByName("tree", aTree,
+                "parameterization", model);
+
+        double logL = distribution.calculateTreeLogLikelihood(aTree);
+        System.out.println(logL);
     }
 }

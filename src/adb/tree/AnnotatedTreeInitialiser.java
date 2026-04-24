@@ -2,9 +2,9 @@ package adb.tree;
 
 import adb.tree.AnnotatedNode.EventNode;
 import adb.distribution.Parameterization;
-import adb.distribution.Parameterization.TypeMap;
 import beast.base.core.Description;
 import beast.base.core.Input;
+import beast.base.core.Log;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.StateNode;
@@ -13,7 +13,6 @@ import beast.base.util.Randomizer;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.IntStream;
 
 import static adb.tree.AnnotatedNode.distributeEvents;
 
@@ -26,15 +25,15 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
     public Input<Tree> treeInput =
             new Input<>("tree", "a standard BEAST2 branching tree", Input.Validate.REQUIRED);
 
-    public Input<Double> scaleInput =
-            new Input<>("scale", "factor used to multiply internal node heights", 1.0);
-
     public Input<Parameterization> parameterizationInput =
             new Input<>("parameterization", "ADB parameterization", Input.Validate.REQUIRED);
 
-    int nTypes;
+    public Input<Double> scaleInput =
+            new Input<>("scale", "factor used to multiply internal node heights", 1.0);
+    // TODO: potentially use automatic scaling to adapt branch lengths to lifetimes
+
+
     Parameterization parameterization;
-    TypeMap[] typeMap;
 
     @Override
     public void initAndValidate() {
@@ -43,10 +42,6 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
         Tree tree = treeInput.get();
         double scale = scaleInput.get();
         parameterization = parameterizationInput.get();
-
-        int nTypes = parameterization.getNTypes();
-        Double originTime = parameterization.getOriginTime();
-        typeMap = parameterization.getTypeMap();
 
         // scale tree
         if (scale != 1.0) {
@@ -58,9 +53,8 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
         // convert to AnnotatedTree
         convertBranchingTree(tree);
 
-        // TODO: solve bug: negative branch lengths in multi-type case
-        // parsimonous types
-        if (nTypes > 1) {
+        // parsimonous ancestral types
+        if (parameterization.getNTypes() > 1) {
             for (Node node : getInternalNodes()) {
                 addAncestralTypes((AnnotatedNode)node);
             }
@@ -71,44 +65,58 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
                 .parallel()
                 .forEach(i -> { */
         for (int i = 0; i < getNodeCount(); i++) {
-            AnnotatedNode node = (AnnotatedNode) getNode(i);
+            AnnotatedNode node = (AnnotatedNode)getNode(i);
             if (node.isRoot()) {
-                if (originTime != null) {
-                    drawEvents(node, originTime);
+                if (parameterization.getOriginTime() != null) {
+                    drawEvents(node, parameterization.getOriginTime());
                 }
             } else {
                 drawEvents(node, node.getParent().getHeight());
             }
             //});
         }
+
+        if (!parameterization.isDirectProgenitor(
+                parameterization.getOriginType(),
+                ((AnnotatedNode)getRoot()).getInitialType())) {
+            Log.warning("WARNING: Type at origin is incompatible with the starting tree.");
+        }
     }
 
 
+    // Draw events along the (multi-type) branch upstream of a node
     private void drawEvents(AnnotatedNode node, double origin) {
         int type = node.getType();
         double start = node.getHeight();
         double end = start;
-        for (int i = 0; i < node.getEventCount(); i++) {
+        int nEvents = node.getEventCount();
+        int ix = 1;
+        int i = 0;
+        while (i < node.getEventCount()) {
             if (node.getEvent(i).getType() == type) {
                 if (node.getParentEvent(i) != null) {
                     end = node.getParentEvent(i).getHeight();
                 } else {
                     end = origin;
                 }
+                i++;
             } else {
                 // draw for current type
-                drawEvents(node, start, end, type);
-                // reset start and type
+                drawEvents(node, ix, start, end, type);
+                i = node.getEventCount() - nEvents + 1;
+                // reset start, type, and counters
                 start = node.getEvent(i).getHeight();
                 type = node.getEvent(i).getType();
+                nEvents = node.getEventCount();
+                ix += i;
             }
         }
-        drawEvents(node, start, end, type);
+        drawEvents(node, ix, start, end, type);
     }
 
 
-    // Draw hidden events according to lifetime distribution
-    private void drawEvents(AnnotatedNode node, double start, double end, int type) {
+    // Draw hidden events along a (single-type) branch segment according to lifetime distribution
+    private void drawEvents(AnnotatedNode node, int ix, double start, double end, int type) {
         double lifetime = parameterization.getLifetime(type);
         double shape = parameterization.getShape(type);
         double length = end - start;
@@ -124,36 +132,52 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
 
             distributeEvents(events, start, end, shape);
             for (int i = 0; i < eventCount; i++) {
-                node.addEvent(events.get(i), true); // TODO: should append at provided index ix?
+                node.addEvent(events.get(i), ix);
+                ix++;
             }
         }
     }
 
+
+    // Propagate types from tips to root, adding minimal intermediate transitions
     private void addAncestralTypes(AnnotatedNode node) {
-        List<EventNode> children = node.getChildEvents(0);
-        int i = children.get(0).getType();
-        int j = children.get(1).getType();
-        int type = 0;
-        if (i == j) { // symmetric division
-            for (int k = 1; k < nTypes; i++) { // find most likely parent
-                if (parameterization.getSymTransition(k, i) > parameterization.getSymTransition(type, j)) {
-                    type = k;
+        int nTypes = parameterization.getNTypes();
+
+        int type;
+        while (true) {
+            List<EventNode> children = node.getChildEvents(0);
+            int i = children.get(0).getType();
+            int j = children.get(1).getType();
+
+            // determine node type
+            if (i == j) { // symmetric division
+                type = 0;
+                for (int k = 0; k < nTypes; k++) {
+                    if (parameterization.getSymTransition(k, i) > parameterization.getSymTransition(type, i)) {
+                        type = k;
+                    }
                 }
-            }
-        } else if (i != j) {
-            if (parameterization.getSymTransition(i, j) == 0.0 && parameterization.getSymTransition(j, i) == 0.0) { // impossible transition: add hidden node
-                // randomly select child, find progenitor type, and add event node
-                int child = Randomizer.nextInt(2); // 0 or 1, i.e. left or right
-                int k = 0;
-                while (!typeMap[k].hasDescendant(j)) { k++; } // TODO: should consider i or j --> StackOverFlow
-                EventNode event = new EventNode(k, Randomizer.uniform(children.get(child).getHeight(), node.getHeight()));
-                ((AnnotatedNode)(node.getChild(child))).addEvent(event, true);
-                // iterate until valid transitions found
-                addAncestralTypes(node);
-            } else if (parameterization.getSymTransition(i, j) >= parameterization.getSymTransition(j, i)) {
-                type = i;
-            } else {
-                type = j;
+                break;
+            } else { // asymmetric division
+                // resolve impossible transitions
+                if (parameterization.getAsymTransition(i, j) == 0.0 && parameterization.getAsymTransition(j, i) == 0.0) {
+                    // select downstream branch to add intermediate types
+                    int child = parameterization.isProgenitor(i, j) ? 1 : 0;
+
+                    // sample progenitor and height
+                    ArrayList<Integer> progenitors = parameterization.getDirectProgenitors(children.get(child).getType());
+                    int k;
+                    do {
+                        k = progenitors.get(Randomizer.nextInt(progenitors.size()));
+                    } while (k == children.get(child).getType());
+                    double height = Randomizer.uniform(children.get(child).getHeight(), node.getHeight());
+                    EventNode event = new EventNode(k, height);
+                    ((AnnotatedNode)(node.getChild(child))).addEvent(event, true);
+
+                } else {
+                    type = (parameterization.getAsymTransition(i, j) >= parameterization.getAsymTransition(j, i)) ? i : j;
+                    break;
+                }
             }
         }
         node.setType(type);

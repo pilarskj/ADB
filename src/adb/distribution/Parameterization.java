@@ -6,7 +6,8 @@ import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.Parameter;
 import beast.base.inference.parameter.RealParameter;
 
-import java.util.stream.IntStream;
+import java.util.ArrayList;
+
 
 public class Parameterization extends CalculationNode {
 
@@ -46,37 +47,9 @@ public class Parameterization extends CalculationNode {
     protected Double originTime;
     protected Integer originType;
 
-    TypeMap[] typeMap;
-    TypeMap[] storedTypeMap;
-
-
-    // Internal class
-    public static class TypeMap {
-        int type;
-        boolean[] progenitors;
-        boolean[] descendants;
-
-        public TypeMap(int type, boolean[] progenitors, boolean[] descendants) {
-            this.type = type;
-            this.progenitors = progenitors;
-            this.descendants = descendants;
-        }
-
-        public void copyFrom(TypeMap other) {
-            // deep copy of all parameters
-            this.type = other.type;
-            System.arraycopy(other.progenitors, 0, this.progenitors, 0, other.progenitors.length);
-            System.arraycopy(other.descendants, 0, this.descendants, 0, other.descendants.length);
-        }
-
-        public boolean hasProgenitor(int type) {
-            return progenitors[type];
-        }
-
-        public boolean hasDescendant(int type) {
-            return descendants[type];
-        }
-    }
+    boolean dirtyTransitions;
+    boolean[][] transitionMatrix, storedTransitionMatrix;
+    boolean[][] transitionGraph, storedTransitionGraph;
 
 
     @Override
@@ -129,11 +102,13 @@ public class Parameterization extends CalculationNode {
             }
         }
 
-        typeMap = new TypeMap[nTypes];
-        storedTypeMap = new TypeMap[nTypes];
-        for (int i = 0; i < nTypes; i++) {
-            updateTypeMap(i);
-        }
+        // create transition maps
+        transitionMatrix = new boolean[nTypes][nTypes];
+        storedTransitionMatrix = new boolean[nTypes][nTypes];
+        transitionGraph = new boolean[nTypes][nTypes];
+        storedTransitionGraph = new boolean[nTypes][nTypes];
+        dirtyTransitions = true;
+        updateTransitions();
     }
 
     public int getNTypes() {
@@ -184,33 +159,73 @@ public class Parameterization extends CalculationNode {
         return originType;
     }
 
-    public TypeMap[] getTypeMap() {
-        if (symTransitions.somethingIsDirty() || asymTransitions.somethingIsDirty()) {
-            for (int i = 0; i < nTypes; i++) {
-                updateTypeMap(i);
-            }
-        }
-        return typeMap;
+    public boolean isDirectProgenitor(int i, int j) {
+        updateTransitions();
+        return transitionMatrix[i][j];
     }
 
-    private void updateTypeMap(int i) {
-        boolean[] progenitors = new boolean[nTypes];
-        boolean[] descendants = new boolean[nTypes];
+    public boolean isProgenitor(int i, int j) {
+        updateTransitions();
+        return transitionGraph[i][j];
+    }
+
+    public ArrayList<Integer> getDirectProgenitors(int i) {
+        updateTransitions();
+        ArrayList<Integer> progenitors = new ArrayList<>();
         for (int j = 0; j < nTypes; j++) {
-            if (getSymTransition(j, i) > 0 || getAsymTransition(j, i) > 0) {
-                progenitors[i] = true;
-            }
-            if (getSymTransition(i, j) > 0 || getAsymTransition(i, j) > 0) {
-                descendants[i] = true;
+            if (isDirectProgenitor(j, i)) {
+                progenitors.add(j);
             }
         }
-        typeMap[i] = new TypeMap(i, progenitors, descendants);
+        return progenitors;
     }
+
+    private void updateTransitions() {
+        if (!dirtyTransitions) {
+            return;
+        }
+
+        // direct transitions (adjacency matrix)
+        for (int i = 0; i < nTypes; i++) {
+            for (int j = 0; j < nTypes; j++) {
+                if (getSymTransition(i, j) > 0 || getAsymTransition(i, j) > 0) {
+                    transitionMatrix[i][j] = true;
+                }
+            }
+        }
+        // indirect transitions (transitive closure) -- Warshall's Algorithm, cf. https://cs.winona.edu/lin/cs440/ch08-2.pdf
+        // deep copy for intialisation
+        for (int i = 0; i < nTypes; i++) {
+            System.arraycopy(transitionMatrix[i], 0, transitionGraph[i], 0, nTypes);
+        }
+        // iteration
+        for (int k = 0; k < nTypes; k++) {
+            for (int i = 0; i < nTypes; i++) {
+                for (int j = 0; j < nTypes; j++) {
+                    transitionGraph[i][j] = transitionGraph[i][j] || (transitionGraph[i][k] && transitionGraph[k][j]);
+                }
+            }
+        }
+
+        dirtyTransitions = false;
+    }
+
+    @Override
+    public boolean requiresRecalculation() {
+        if (symTransitions.somethingIsDirty() || asymTransitions.somethingIsDirty()) {
+            // TODO: monitor only binary changes (0 or >0), not probability updates
+            dirtyTransitions = true;
+        }
+
+        return true;
+    }
+
 
     @Override
     protected void store() {
         for (int i = 0; i < nTypes; i++) {
-            storedTypeMap[i].copyFrom(typeMap[i]);
+            System.arraycopy(transitionMatrix[i], 0, storedTransitionMatrix[i], 0, nTypes);
+            System.arraycopy(transitionGraph[i], 0, storedTransitionGraph[i], 0, nTypes);
         }
         super.store();
     }
@@ -218,10 +233,16 @@ public class Parameterization extends CalculationNode {
 
     @Override
     protected void restore() {
-        TypeMap[] tmp;
-        tmp = typeMap;
-        typeMap = storedTypeMap;
-        storedTypeMap = tmp;
+        boolean[][] tmp;
+
+        tmp = transitionMatrix;
+        transitionMatrix = storedTransitionMatrix;
+        storedTransitionMatrix = tmp;
+
+        tmp = transitionGraph;
+        transitionGraph = storedTransitionGraph;
+        storedTransitionGraph = tmp;
+
         super.restore();
     }
 
