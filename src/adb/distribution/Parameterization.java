@@ -6,6 +6,8 @@ import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.Parameter;
 import beast.base.inference.parameter.RealParameter;
 
+import java.util.stream.IntStream;
+
 public class Parameterization extends CalculationNode {
 
     public Input<Integer> nTypesInput =
@@ -49,7 +51,7 @@ public class Parameterization extends CalculationNode {
 
 
     // Internal class
-    public class TypeMap {
+    public static class TypeMap {
         int type;
         boolean[] progenitors;
         boolean[] descendants;
@@ -126,6 +128,12 @@ public class Parameterization extends CalculationNode {
                 throw new IllegalArgumentException("All transition probabilities per type must sum to 1!");
             }
         }
+
+        typeMap = new TypeMap[nTypes];
+        storedTypeMap = new TypeMap[nTypes];
+        for (int i = 0; i < nTypes; i++) {
+            updateTypeMap(i);
+        }
     }
 
     public int getNTypes() {
@@ -176,24 +184,27 @@ public class Parameterization extends CalculationNode {
         return originType;
     }
 
-    public TypeMap getTypeMap(int i) {
+    public TypeMap[] getTypeMap() {
         if (symTransitions.somethingIsDirty() || asymTransitions.somethingIsDirty()) {
-            updateTypeMap(i);
+            for (int i = 0; i < nTypes; i++) {
+                updateTypeMap(i);
+            }
         }
-        return typeMap[i];
+        return typeMap;
     }
 
     private void updateTypeMap(int i) {
-        boolean[] progenitors = new boolean[this.nTypes];
-        boolean[] descendants = new boolean[this.nTypes];
-        for (int j = 0; j < nTypes; i++) {
-            if (this.getSymTransition(j, i) > 0 || this.getAsymTransition(j, i) > 0) {
+        boolean[] progenitors = new boolean[nTypes];
+        boolean[] descendants = new boolean[nTypes];
+        for (int j = 0; j < nTypes; j++) {
+            if (getSymTransition(j, i) > 0 || getAsymTransition(j, i) > 0) {
                 progenitors[i] = true;
             }
-            if (this.getSymTransition(i, j) > 0 || this.getAsymTransition(i, j) > 0) {
+            if (getSymTransition(i, j) > 0 || getAsymTransition(i, j) > 0) {
                 descendants[i] = true;
             }
         }
+        typeMap[i] = new TypeMap(i, progenitors, descendants);
     }
 
     @Override

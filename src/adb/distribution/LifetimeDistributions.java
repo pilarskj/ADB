@@ -40,7 +40,7 @@ public class LifetimeDistributions extends CalculationNode {
 
 
     // Internal class
-    public class LifetimeDistribution {
+    public static class LifetimeDistribution {
         double lifetime;
         double shape;
         Complex[] pdfFFT;

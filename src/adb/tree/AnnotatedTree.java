@@ -1,5 +1,7 @@
 package adb.tree;
 
+import adb.tree.AnnotatedNode.EventNode;
+
 import beast.base.core.Description;
 import beast.base.core.Log;
 import beast.base.evolution.tree.Node;
@@ -120,7 +122,7 @@ public class AnnotatedTree extends Tree {
 
     // function to convert a strictly bifurcating tree in AnnotatedTree
     // cf. https://github.com/tgvaughan/MultiTypeTree/blob/master/src/multitypetree/evolution/tree/MultiTypeTreeFromUntypedNewick.java
-    protected void convertBranchingTree(Tree tree) {
+    public void convertBranchingTree(Tree tree) {
 
         // create all nodes
         AnnotatedNode[] annotatedNodes = new AnnotatedNode[tree.getNodeCount()];
@@ -167,7 +169,7 @@ public class AnnotatedTree extends Tree {
     // function to convert a tree with single-child nodes in AnnotatedTree
     // cf. https://github.com/tgvaughan/MultiTypeTree/blob/master/src/multitypetree/evolution/tree/MultiTypeTree.java#L538
     // but using tips-to-root traversal
-    protected void convertEventTree(Tree tree) {
+    public void convertEventTree(Tree tree) {
 
         // map to keep track of the AnnotatedNodes (key: original Node Nr, value: new AnnotatedNode)
         Map<Integer, AnnotatedNode> nodeMap = new HashMap<>();
@@ -224,6 +226,75 @@ public class AnnotatedTree extends Tree {
             current = current.getLeft();
         }
         return nodeMap.get(current.getNr());
+    }
+
+
+    // function to convert AnnotatedTree to Tree with single-child nodes compatible with newick format
+    public Tree convertAnnotatedTree(boolean recordType) {
+
+        // create new tree to modify
+        Tree tree = copy();
+        tree.initArrays();
+
+        List<Node> nodes = new ArrayList<>();
+        int nextNr = getNodeCount();
+        for (Node node : getNodesAsArray()) {
+            AnnotatedNode aNode = (AnnotatedNode)node;
+            int nodeNr = node.getNr();
+
+            Node startNode = tree.getNode(nodeNr);
+            if (recordType) {
+                startNode.setMetaData("type", aNode.getType());
+                startNode.metaDataString = String.format("%s=%d", "type", aNode.getType());
+            }
+            nodes.add(startNode);
+
+            Node endNode = startNode.getParent();
+            Node branchNode = startNode;
+            Node eventNode;
+            for (int i = 1; i < aNode.getEventCount(); i++) {
+
+                // create and label new node
+                eventNode = new Node();
+                eventNode.setNr(nextNr);
+                nextNr++;
+
+                // connect to child and parent
+                branchNode.setParent(eventNode);
+                eventNode.addChild(branchNode);
+
+                // set height and type
+                eventNode.setHeight(aNode.getEvent(i).getHeight());
+                if (recordType) {
+                    eventNode.setMetaData("type", aNode.getEvent(i).getType());
+                    eventNode.metaDataString = String.format("%s=%d", "type", aNode.getEvent(i).getType());
+                }
+
+                // update branchNode
+                nodes.add(eventNode);
+                branchNode = eventNode;
+            }
+
+            // connect final branchNode to the original parent
+            if (endNode != null) {
+                branchNode.setParent(endNode);
+                if (endNode.getLeft() == startNode) {
+                    endNode.setLeft(branchNode);
+                } else {
+                    endNode.setRight(branchNode);
+                }
+            }
+        }
+
+        // number in order for resetting the root
+        for (int i = 0; i < nodes.size(); i++) {
+            nodes.get(i).setNr(i);
+            nodes.get(i).setID(String.valueOf(i));
+        }
+
+        // re-initialize
+        tree = new Tree(nodes.get(nodes.size() - 1));
+        return tree;
     }
 
 
@@ -300,7 +371,7 @@ public class AnnotatedTree extends Tree {
      */
     @Override
     public void assignFromFragile(final StateNode other) {
-        AnnotatedTree tree = (AnnotatedTree) other;
+        AnnotatedTree tree = (AnnotatedTree)other;
         if (m_nodes == null) {
             initArrays();
         }

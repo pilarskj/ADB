@@ -1,8 +1,8 @@
 package adb.distribution;
 
 import adb.tree.AnnotatedNode;
+import adb.tree.AnnotatedNode.EventNode;
 import adb.tree.AnnotatedTree;
-import adb.tree.EventNode;
 import adb.util.Utils;
 
 import beast.base.core.Description;
@@ -119,7 +119,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             // check whether the shape parameter is an integer
             if (!parameterization.shapeIsInteger()) {
                 throw new IllegalArgumentException("The approximation only works for an integer shape parameter!");
-            };
+            }
         }
 
         if (useBD && nTypes > 1) {
@@ -530,7 +530,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         double[] P0 = P0System.getP0()[0];
 
         // get average P0 over branch
-        // use binary search to find closest indices to the branch lengths in time array (t0 is sorted per definition!)
+        // use binary search to find the closest indices to the branch lengths in time array (t0 is sorted per definition!)
         double[] P0Slice = Arrays.copyOfRange(P0, Utils.findClosestIndex(timeArray, start), Utils.findClosestIndex(timeArray, end) + 1);
         double P0M = Utils.getMean(P0Slice); // TODO: take extrapolated values using P0Map
 

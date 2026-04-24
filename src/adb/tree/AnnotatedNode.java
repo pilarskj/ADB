@@ -23,6 +23,35 @@ public class AnnotatedNode extends Node {
     protected List<EventNode> events = new ArrayList<>();
 
 
+    // Internal class: A node marking a branching event along the lineage.
+    public static class EventNode {
+
+        protected int type;
+        protected double height;
+
+        public EventNode(int type, double height) {
+            this.type = type;
+            this.height = height;
+        }
+
+        public int getType() {
+            return type;
+        }
+
+        public void setType(int type) {
+            this.type = type;
+        }
+
+        public double getHeight() {
+            return height;
+        }
+
+        public void setHeight(double height) {
+            this.height = height;
+        }
+    }
+
+
     public List<EventNode> getEvents() {
         return events;
     }
@@ -31,11 +60,10 @@ public class AnnotatedNode extends Node {
         this.events = events;
     }
 
+    // restore event list with the node itself being the only event
     public void clearEvents() {
         events.clear();
-        // restore event list with the node itself being the only event
-        EventNode branchingEvent = new EventNode(getType(this), this.height);
-        events.add(branchingEvent);
+        events.add(new EventNode(getType(), height));
     }
 
     public int getEventCount() {
@@ -55,7 +83,7 @@ public class AnnotatedNode extends Node {
     }
 
     public void setType(int type) {
-        events.set(0, new EventNode(type, this.height));
+        events.get(0).setType(type);
     }
 
     // get type of any Node // TODO: make more generic?
@@ -64,7 +92,7 @@ public class AnnotatedNode extends Node {
         if (node.getMetaData("type") == null) {
             type = 0;
         } else {
-            type = (int) (double) node.getMetaData("type");
+            type = (int)(double)node.getMetaData("type");
         }
         return type;
     }
@@ -99,7 +127,7 @@ public class AnnotatedNode extends Node {
         if (pidx < events.size()) {
             return events.get(pidx); // predecessor is a hidden node
         } else {
-            AnnotatedNode parent = (AnnotatedNode) this.parent;
+            AnnotatedNode parent = (AnnotatedNode)this.parent;
             if (parent == null) {
                 return null; // this event is first in the whole tree
             } else {
@@ -119,11 +147,11 @@ public class AnnotatedNode extends Node {
                 return null;
             } else {
                 // two children
-                AnnotatedNode left = (AnnotatedNode) this.getLeft();
+                AnnotatedNode left = (AnnotatedNode)getLeft();
                 List<EventNode> leftEvents = left.getEvents();
                 children.add(0, leftEvents.get(leftEvents.size() - 1));
 
-                AnnotatedNode right = (AnnotatedNode) this.getRight();
+                AnnotatedNode right = (AnnotatedNode)getRight();
                 List<EventNode> rightEvents = right.getEvents();
                 children.add(1, rightEvents.get(rightEvents.size() - 1));
             }
@@ -146,10 +174,10 @@ public class AnnotatedNode extends Node {
     public double[] getWaitingTimes(double origin) { // if operating on trees with stem branch
         double[] times = new double[events.size()];
         for (int i = 0; i < times.length; i++) {
-            if (this.getParentEvent(i) == null) { // relevant for the first event in the tree
+            if (getParentEvent(i) == null) { // relevant for the first event in the tree
                 times[i] = origin - events.get(i).getHeight();
             } else {
-                times[i] = this.getParentEvent(i).getHeight() - events.get(i).getHeight();
+                times[i] = getParentEvent(i).getHeight() - events.get(i).getHeight();
             }
         }
         return times;
@@ -160,12 +188,32 @@ public class AnnotatedNode extends Node {
         double[] segmentLengths = this.getWaitingTimes(origin); // TODO: special option for stem branch?
         double[] newSegmentLengths = Utils.distributeDirichlet(segmentLengths, alpha);
 
-        double height = this.getHeight();
+        double height = getHeight();
         for (int i = 1; i < events.size(); i++) {
             height = height + newSegmentLengths[i - 1];
-            EventNode event = events.get(i);
-            event.setHeight(height);
-            events.set(i, event);
+            events.get(i).setHeight(height);
+        }
+    }
+
+    // re-distribute events according to Dirichlet distribution
+    public static void distributeEvents(List<EventNode> events, double start, double end, double alpha) {
+        int n = events.size();
+
+        // collect waiting times
+        double[] segmentLengths = new double[n + 1];
+        segmentLengths[0] = events.get(0).getHeight() - start;
+        for (int i = 1; i < n; i++) {
+            segmentLengths[i] = events.get(i).getHeight() - events.get(i - 1).getHeight();
+        }
+        segmentLengths[n] = end - events.get(n - 1).getHeight();
+
+        // re-distribute
+        double[] newSegmentLengths = Utils.distributeDirichlet(segmentLengths, alpha);
+
+        double height = start;
+        for (int i = 0; i < n; i++) {
+            height = height + newSegmentLengths[i];
+            events.get(i).setHeight(height);
         }
     }
 
@@ -206,6 +254,7 @@ public class AnnotatedNode extends Node {
     /**
      * (Deep) copy of node *
      */
+    @Override
     public AnnotatedNode copy() {
         AnnotatedNode node = new AnnotatedNode();
         node.height = height;
@@ -214,10 +263,10 @@ public class AnnotatedNode extends Node {
         node.parent = null;
         node.ID = ID;
         node.events.addAll(events);
-        if (getLeft()!=null) {
+        if (getLeft() != null) {
             node.setLeft(getLeft().copy());
             node.getLeft().setParent(node);
-            if (getRight()!=null) {
+            if (getRight() != null) {
                 node.setRight(getRight().copy());
                 node.getRight().setParent(node);
             }
