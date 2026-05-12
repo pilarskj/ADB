@@ -63,7 +63,7 @@ public class AnnotatedNode extends Node {
     // restore event list with the node itself being the only event
     public void clearEvents() {
         events.clear();
-        events.add(new EventNode(getType(), height));
+        events.add(new EventNode(getType(this), height));
     }
 
     public int getEventCount() {
@@ -73,6 +73,8 @@ public class AnnotatedNode extends Node {
     public EventNode getEvent(int idx) {
         return events.get(idx);
     }
+
+    public void setEvent(EventNode event, int idx) { events.set(idx, event); }
 
     public int getInitialType() { // past type
         return events.get(events.size() - 1).type;
