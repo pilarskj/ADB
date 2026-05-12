@@ -2,10 +2,14 @@ package adb.tree;
 
 import adb.distribution.ADBTreeDistribution;
 import adb.distribution.Parameterization;
+import beast.base.evolution.alignment.Alignment;
+import beast.base.evolution.tree.ClusterTree;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
+import beast.base.core.Function.Constant;
+import feast.fileio.AlignmentFromNexus;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -80,7 +84,48 @@ public class AnnotatedTreeTest {
                 "originTime", 10.0);
 
         AnnotatedTree aTree = new AnnotatedTreeInitialiser();
-        aTree.initByName("tree", tree, "parameterization", model, "scale", 0.8);
+        aTree.initByName("tree", tree, "parameterization", model, "scale", 1.0);
+        System.out.println(aTree);
+
+        tree = aTree.convertAnnotatedTree(true);
+        System.out.println(tree);
+
+        // calculate tree log-likelihood (check if not -Infinity)
+        ADBTreeDistribution distribution = new ADBTreeDistribution();
+        distribution.initByName("tree", aTree,
+                "parameterization", model);
+
+        double logL = distribution.calculateTreeLogLikelihood(aTree);
+        System.out.println(logL);
+    }
+
+
+    @Test
+    public void testInitialisationFromAlignment() throws Exception {
+
+        Alignment alignment = new AlignmentFromNexus();
+        alignment.initByName("fileName", "/Users/jpilarski/Projects/mtADB/alignments/alignment-multi-type.nexus");
+
+        Tree tree = new ClusterTree();
+        tree.initByName("clusterType", "upgma",
+                "taxa", alignment,
+                "clock.rate", new Constant("0.05"));
+
+        System.out.println(tree);
+
+        Parameterization model = new Parameterization();
+        model.initByName("nTypes", 4,
+                "lifetime", new RealParameter("0.5 1 2 3"),
+                "shape", new IntegerParameter("100 50 20 5"),
+                "death", new RealParameter("0.05 0.1 0.1 0.1"),
+                "symTransitions", new RealParameter("0.4 0 0 0 0 0.2 0 0 0 0 1 0 0 0 0 1"),
+                "asymTransitions", new RealParameter("0 0.6 0 0 0 0 0.5 0.3 0 0 0 0 0 0 0 0"),
+                "sampling", new RealParameter("0.005 0.005 0.005 0.005"),
+                "originTime", 10.0);
+
+        // TODO: taxa names and metadata get lost!
+        AnnotatedTree aTree = new AnnotatedTreeInitialiser();
+        aTree.initByName("tree", tree, "parameterization", model, "scale", 1.0);
         System.out.println(aTree);
 
         tree = aTree.convertAnnotatedTree(true);

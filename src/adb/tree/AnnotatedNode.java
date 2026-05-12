@@ -111,11 +111,37 @@ public class AnnotatedNode extends Node {
         events.add(idx, event);
     }
 
+    public void addEvents(List<EventNode> events, boolean append) {
+        if (append) { // append at end
+            this.events.addAll(events);
+        } else { // find the correct spot
+            for (EventNode event : events) {
+                addEvent(event, false);
+            }
+        }
+    }
 
     public void removeEvent(int idx) {
         if (idx >= events.size())
             throw new IllegalArgumentException("Index to removeEvent() out of range.");
         events.remove(idx);
+    }
+
+    // binary search to find the index of the first event above some height threshold
+    public int findEventAbove(double height) {
+        int ix = events.size();
+        int min = 0;
+        int max = events.size() - 1;
+        while (min <= max) {
+            int mid = (min + max) / 2;
+            if (events.get(mid).getHeight() > height) {
+                ix = mid;
+                max = mid - 1; // try to find an even earlier valid index
+            } else {
+                min = mid + 1;
+            }
+        }
+        return ix;
     }
 
     public void sortEvents() {
