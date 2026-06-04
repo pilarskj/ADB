@@ -123,6 +123,10 @@ public class AnnotatedNode extends Node {
         }
     }
 
+    public void addEvents(List<EventNode> events, int ix) {
+        this.events.addAll(ix, events);
+    }
+
     public void removeEvent(int idx) {
         if (idx >= events.size())
             throw new IllegalArgumentException("Index to removeEvent() out of range.");
