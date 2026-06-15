@@ -131,7 +131,8 @@ public class AnnotatedWilsonBalding extends TreeOperator {
         ((AnnotatedNode)j).setEvents(jEventsBelow);
 
         // for testing
-        // System.out.println(((AnnotatedTree)tree).convertAnnotatedTree(false));
+        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
+        System.out.println(flatTree.getRoot().toNewick());
         return Math.log(hastingsRatio);
     }
 

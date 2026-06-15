@@ -243,6 +243,7 @@ public class AnnotatedTree extends Tree {
             int nodeNr = node.getNr();
 
             Node startNode = tree.getNode(nodeNr);
+            startNode.setID(aNode.getID());
             if (recordType) {
                 startNode.setMetaData("type", aNode.getType());
                 startNode.metaDataString = String.format("%s=%d", "type", aNode.getType());
@@ -289,7 +290,6 @@ public class AnnotatedTree extends Tree {
         // number in order for resetting the root
         for (int i = 0; i < nodes.size(); i++) {
             nodes.get(i).setNr(i);
-            nodes.get(i).setID(String.valueOf(i));
         }
 
         // re-initialize

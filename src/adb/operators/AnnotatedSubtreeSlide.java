@@ -29,7 +29,7 @@ public class AnnotatedSubtreeSlide extends TreeOperator {
         }
 
         size = sizeInput.get();
-        //limit = limitInput.get();
+
     }
 
     @Override

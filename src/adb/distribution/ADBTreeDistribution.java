@@ -248,9 +248,11 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             conditionFactor = -Math.log(1 - P0[originType][nSteps - 1]);
 
             if (tree instanceof AnnotatedTree) {
-                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) root, rootHeight, originTime));
+                double[] subtreeLikelihood = new double[tree.getNodeCount()];
+                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) root, rootHeight, originTime, subtreeLikelihood));
             } else {
-                logL = Math.log(calculateSubtreeLikelihood(root, rootHeight, originTime)[originType]);
+                double[][] subtreeLikelihood = new double[tree.getNodeCount()][nTypes];
+                logL = Math.log(calculateSubtreeLikelihood(root, rootHeight, originTime, subtreeLikelihood)[originType]);
             }
 
         } else {
@@ -259,11 +261,13 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             Node leftSubtree = root.getLeft();
             Node rightSubtree = root.getRight();
             if (tree instanceof AnnotatedTree) {
-                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) leftSubtree, leftSubtree.getHeight(), rootHeight)) +
-                        Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) rightSubtree, rightSubtree.getHeight(), rootHeight));
+                double[] subtreeLikelihood = new double[tree.getNodeCount()];
+                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) leftSubtree, leftSubtree.getHeight(), rootHeight, subtreeLikelihood)) +
+                        Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) rightSubtree, rightSubtree.getHeight(), rootHeight, subtreeLikelihood));
             } else {
-                logL = Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight)[getType(root)]) +
-                        Math.log(calculateSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), rootHeight)[getType(root)]);
+                double[][] subtreeLikelihood = new double[tree.getNodeCount()][nTypes];
+                logL = Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight, subtreeLikelihood)[getType(root)]) +
+                        Math.log(calculateSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), rootHeight, subtreeLikelihood)[getType(root)]);
             }
         }
 
@@ -273,7 +277,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
 
     // track time backwards (start < end)
-    private double[] calculateSubtreeLikelihood(Node node, double start, double end) {
+    private double[] calculateSubtreeLikelihood(Node node, double start, double end, double[][] subtreeLikelihood) {
 
         double[] likelihood = new double[nTypes];
         int type = getType(node);
@@ -291,8 +295,8 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         } else {
             Node leftChild = node.getLeft();
             Node rightChild = node.getRight();
-            double[] leftSubtreeLik = calculateSubtreeLikelihood(leftChild, leftChild.getHeight(), start);
-            double[] rightSubtreeLik = calculateSubtreeLikelihood(rightChild, rightChild.getHeight(), start);
+            double[] leftSubtreeLik = calculateSubtreeLikelihood(leftChild, leftChild.getHeight(), start, subtreeLikelihood);
+            double[] rightSubtreeLik = calculateSubtreeLikelihood(rightChild, rightChild.getHeight(), start, subtreeLikelihood);
 
             for (int i = 0; i < nTypes; i++) {
                 double lik = 0;
@@ -309,11 +313,12 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             }
         }
 
+        System.arraycopy(likelihood, 0, subtreeLikelihood[node.getNr()], 0, nTypes);
         return likelihood;
     }
 
 
-    private double calculateAnnotatedSubtreeLikelihood(AnnotatedNode node, double start, double end) {
+    private double calculateAnnotatedSubtreeLikelihood(AnnotatedNode node, double start, double end, double[] subtreeLikelihood) {
 
         double likelihood;
 
@@ -348,10 +353,11 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             }
 
             likelihood = branchDensity * factor *
-                    calculateAnnotatedNodeLikelihood(leftSubtree, leftSubtree.getHeight(), node.getHeight()) *
-                    calculateAnnotatedNodeLikelihood(rightSubtree, rightSubtree.getHeight(), node.getHeight());
+                    calculateAnnotatedSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), node.getHeight(), subtreeLikelihood) *
+                    calculateAnnotatedSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), node.getHeight(), subtreeLikelihood);
         }
 
+        subtreeLikelihood[node.getNr()] = likelihood;
         return likelihood;
     }
 
