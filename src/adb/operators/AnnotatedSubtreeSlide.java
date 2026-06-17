@@ -14,30 +14,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 // modified version of beast.base.evolution.operator.SubtreeSlide
-public class AnnotatedSubtreeSlide extends TreeOperator {
+public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
 
     public Input<Integer> sizeInput = new Input<>("size", "the size of the sliding window up and down, default 1", 1);
 
     protected int size;
 
+
     @Override
     public void initAndValidate() {
-
-        Tree tree = (Tree) InputUtil.get(treeInput, this);
-        if (!(tree instanceof AnnotatedTree)) {
-            throw new IllegalArgumentException("Attempted to initialise annotated tree operator with regular tree.");
-        }
-
+        super.initAndValidate();
         size = sizeInput.get();
-
     }
+
 
     @Override
     public double proposal() {
 
         Tree tree = (Tree) InputUtil.get(treeInput, this);
 
-        double logq;
+        double logHR;
 
         Node i;
         final boolean markClades = markCladesInput.get();
@@ -134,7 +130,7 @@ public class AnnotatedSubtreeSlide extends TreeOperator {
 
                 // count the hypothetical sources of this destination
                 int possibleSources = intersectingEdges(newChild, oldHeight, null);
-                logq = -Math.log(possibleSources);
+                logHR = -Math.log(possibleSources);
 
 
             // 3.1.2 if topology does not change
@@ -146,7 +142,7 @@ public class AnnotatedSubtreeSlide extends TreeOperator {
                 ((AnnotatedNode)i).addEvents(pEvents, true);
                 ((AnnotatedNode)CiP).addEvents(pEvents, true);
                 pEvents.clear();
-                logq = 0.0;
+                logHR = 0.0;
             }
 
 
@@ -218,7 +214,7 @@ public class AnnotatedSubtreeSlide extends TreeOperator {
                     }
                 }
 
-                logq = Math.log(possibleDestinations);
+                logHR = Math.log(possibleDestinations);
 
 
             // 3.2.2 if topology does not change
@@ -231,12 +227,13 @@ public class AnnotatedSubtreeSlide extends TreeOperator {
                 ((AnnotatedNode)p).addEvents(events,0);
                 events.clear();
                 ((AnnotatedNode)CiP).getEvents().removeIf(e -> e.getHeight() >= newHeight);
-                logq = 0.0;
+                logHR = 0.0;
             }
         }
 
-        System.out.println(((AnnotatedTree)tree).convertAnnotatedTree(false));
-        return logq;
+        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
+        System.out.println(flatTree.getRoot().toNewick());
+        return logHR;
     }
 
 

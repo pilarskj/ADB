@@ -13,24 +13,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 // modified version of beast.base.evolution.operator.WilsonBalding
-public class AnnotatedWilsonBalding extends TreeOperator {
-
-
-    @Override
-    public void initAndValidate() {
-
-        Tree tree = (Tree) InputUtil.get(treeInput, this);
-        if (!(tree instanceof AnnotatedTree)) {
-            throw new IllegalArgumentException("Attempted to initialise annotated tree operator with regular tree.");
-        }
-    }
+public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
 
     @Override
     public double proposal() {
 
         Tree tree = (Tree) InputUtil.get(treeInput, this);
 
-        double oldMinAge, newMinAge, newEventHeight, hastingsRatio;
+        double oldMinAge, newMinAge, oldBranchProb, newBranchProb, newEventHeight, logHR;
         int oldEventsCount, newEventsCount, oldMinNr, newMinNr, newEventNr;
 
         // choose a random node avoiding root
@@ -79,7 +69,15 @@ public class AnnotatedWilsonBalding extends TreeOperator {
             return Double.NEGATIVE_INFINITY;
         }
 
-        hastingsRatio = (double) newEventsCount / oldEventsCount;
+        logHR = Math.log((double) newEventsCount / oldEventsCount);
+
+        // TODO: extend to multi-type version
+        if (parameterization != null && parameterization.getNTypes() == 1) {
+            // calculate current branch probability
+            oldBranchProb = getBranchProbability((AnnotatedNode)i);
+        } else {
+            oldBranchProb = 0.0;
+        }
 
         // sample
         newEventNr = newMinNr + Randomizer.nextInt(newEventsCount);
@@ -126,14 +124,22 @@ public class AnnotatedWilsonBalding extends TreeOperator {
         }
 
         ((AnnotatedNode)CiP).addEvents(((AnnotatedNode)p).getEvents(), true); // join lists for CiP and p
-        ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newEventHeight); // only keep events below cut
         ((AnnotatedNode)p).setEvents(jEventsAbove);
         ((AnnotatedNode)j).setEvents(jEventsBelow);
+
+        // TODO: extend resampling events to multi-type version
+        if (parameterization != null && parameterization.getNTypes() == 1) {
+            // resample events along branch and calculate probability
+            newBranchProb = resampleEvents((AnnotatedNode)i);
+            logHR += (newBranchProb - oldBranchProb);
+        } else {
+            ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newEventHeight); // only keep events below cut
+        }
 
         // for testing
         Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
         System.out.println(flatTree.getRoot().toNewick());
-        return Math.log(hastingsRatio);
+        return logHR;
     }
 
 }

@@ -9,6 +9,7 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.StateNode;
 import beast.base.inference.StateNodeInitialiser;
 
+import java.io.PrintStream;
 import java.util.*;
 
 import static adb.tree.AnnotatedNode.getType;
@@ -465,6 +466,21 @@ public class AnnotatedTree extends Tree {
             sink.events.clear();
             sink.events.addAll(src.events);
         }
+    }
+
+
+    /**
+     * String representation for logging *
+     */
+    @Override
+    public void log(long sample, PrintStream out) {
+        Tree tree = (Tree) getCurrent();
+        out.print("tree STATE_" + sample + " = ");
+        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false); // TODO: depends on the number of types!
+        // String newick = flatTree.getRoot().toSortedNewick(new int[1], true); // TODO: use toSortedNewick
+        String newick = flatTree.getRoot().toNewick();
+        out.print(newick);
+        out.print(";");
     }
 
     // TODO: String representation of annotated tree

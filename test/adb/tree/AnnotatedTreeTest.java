@@ -44,8 +44,8 @@ public class AnnotatedTreeTest {
     public void testDirichlet() {
         double[] x = {4, 4, 4};
         double alpha = 5;
-        double[] res = distributeDirichlet(x, alpha);
-        System.out.println(Arrays.toString(res));
+        distributeDirichlet(x, alpha);
+        System.out.println(Arrays.toString(x));
     }
 
     @Test

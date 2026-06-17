@@ -1,6 +1,7 @@
 package adb.util;
 
 import beast.base.util.Randomizer;
+import org.apache.commons.math.special.Gamma;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -175,7 +176,7 @@ public class Utils {
     }
 
     // https://stats.stackexchange.com/questions/69210/drawing-from-dirichlet-distribution
-    public static double[] distributeDirichlet(double[] x, double alpha){
+    public static void distributeDirichlet(double[] x, double alpha){
         int n = x.length;
         double sumX = 0;
         for (int i = 0; i < n; i++) {
@@ -197,9 +198,41 @@ public class Utils {
             p[i] = y[i] / sumY;
             x[i] = p[i] * sumX;
         }
-
-        return x;
     }
+
+
+    public static double distributeDirichletProbability(double[] x, double alpha){
+        int n = x.length;
+        double sumX = 0;
+        for (int i = 0; i < n; i++) {
+            sumX += x[i];
+        }
+
+        // draw n independent random samples from Gamma distribution
+        double[] y = new double[n];
+        double sumY = 0;
+        for (int i = 0; i < n; i++) {
+            y[i] = Randomizer.nextGamma(alpha, 1);
+            sumY += y[i];
+        }
+
+        // divide by the sum to obtain a sample from the Dirichlet distribution
+        // and multiply the original value in array with the sampled factor
+        // sum logs for probability
+        double logP = 0;
+        double[] p = new double[n];
+        for (int i = 0; i < n; i++) {
+            p[i] = y[i] / sumY;
+            logP += Math.log(p[i]);
+            x[i] = p[i] * sumX;
+        }
+
+        // probability under Dirichlet distribution
+        double logDirichlet = Gamma.logGamma(n * alpha) - n * Gamma.logGamma(alpha) + (alpha - 1) * logP;
+        // probability accounting for transformation
+        return  -(n - 1) * Math.log(sumX) + logDirichlet;
+    }
+
 
     public static void saveArrays(double[] x, double[] y, int thin, String header, String fileName) {
         try (PrintWriter writer = new PrintWriter(new FileWriter(fileName))) {

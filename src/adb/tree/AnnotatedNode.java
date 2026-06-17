@@ -216,11 +216,11 @@ public class AnnotatedNode extends Node {
     // re-distribute events according to Dirichlet distribution
     public void distributeEvents(double alpha, double origin) {
         double[] segmentLengths = this.getWaitingTimes(origin); // TODO: special option for stem branch?
-        double[] newSegmentLengths = Utils.distributeDirichlet(segmentLengths, alpha);
+        Utils.distributeDirichlet(segmentLengths, alpha);
 
         double height = getHeight();
         for (int i = 1; i < events.size(); i++) {
-            height = height + newSegmentLengths[i - 1];
+            height = height + segmentLengths[i - 1];
             events.get(i).setHeight(height);
         }
     }
@@ -238,11 +238,11 @@ public class AnnotatedNode extends Node {
         segmentLengths[n] = end - events.get(n - 1).getHeight();
 
         // re-distribute
-        double[] newSegmentLengths = Utils.distributeDirichlet(segmentLengths, alpha);
+        Utils.distributeDirichlet(segmentLengths, alpha);
 
         double height = start;
         for (int i = 0; i < n; i++) {
-            height = height + newSegmentLengths[i];
+            height = height + segmentLengths[i];
             events.get(i).setHeight(height);
         }
     }
