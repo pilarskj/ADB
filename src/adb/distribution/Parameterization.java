@@ -82,7 +82,11 @@ public class Parameterization extends CalculationNode {
 
         // assert that parameters fall in the proper range
         lifetime.setLower(Math.max(lifetime.getLower(), 0.0));
-        shape.setLower(Math.max(((Number)shape.getLower()).doubleValue(), 0));
+        if (shape instanceof RealParameter) {
+            ((RealParameter)shape).setLower(Math.max(((Double)shape.getLower()), 0));
+        } else if (shape instanceof IntegerParameter) {
+            ((IntegerParameter)shape).setLower(Math.max(((Integer)shape.getLower()), 1));
+        }
         death.setBounds(Math.max(death.getLower(), 0.0), Math.min(death.getUpper(), 1.0));
         sampling.setBounds(Math.max(sampling.getLower(), 0.0), Math.min(sampling.getUpper(), 1.0));
         symTransitions.setBounds(Math.max(symTransitions.getLower(), 0.0), Math.min(symTransitions.getUpper(), 1.0));
@@ -109,6 +113,7 @@ public class Parameterization extends CalculationNode {
         storedTransitionGraph = new boolean[nTypes][nTypes];
         dirtyTransitions = true;
         updateTransitions();
+        dirtyTransitions = false;
     }
 
     public int getNTypes() {
@@ -206,8 +211,6 @@ public class Parameterization extends CalculationNode {
                 }
             }
         }
-
-        dirtyTransitions = false;
     }
 
     @Override
@@ -227,6 +230,7 @@ public class Parameterization extends CalculationNode {
             System.arraycopy(transitionMatrix[i], 0, storedTransitionMatrix[i], 0, nTypes);
             System.arraycopy(transitionGraph[i], 0, storedTransitionGraph[i], 0, nTypes);
         }
+        dirtyTransitions = false;
         super.store();
     }
 
@@ -243,7 +247,15 @@ public class Parameterization extends CalculationNode {
         transitionGraph = storedTransitionGraph;
         storedTransitionGraph = tmp;
 
+        dirtyTransitions = false;
         super.restore();
+    }
+
+
+    @Override
+    protected void accept() {
+        dirtyTransitions = false;
+        super.accept();
     }
 
 }

@@ -451,7 +451,7 @@ public class AnnotatedTree extends Tree {
      * Helper to store *
      */
     private void storeNodes(int start, int end) {
-        for (int i = start; i<end; i++) {
+        for (int i = start; i < end; i++) {
             AnnotatedNode sink = (AnnotatedNode)m_storedNodes[i];
             AnnotatedNode src = (AnnotatedNode)m_nodes[i];
             sink.setHeight(src.getHeight());

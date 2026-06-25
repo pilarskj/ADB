@@ -22,8 +22,8 @@ UPGMA + scaling + regular segments + parsimonous type transitions
 @Description("Class to initialize an AnnotatedTree from Tree")
 public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNodeInitialiser {
 
-    public Input<Tree> treeInput =
-            new Input<>("tree", "a standard BEAST2 branching tree", Input.Validate.REQUIRED);
+    public Input<Tree> branchingTreeInput =
+            new Input<>("branchingTree", "a standard BEAST2 branching tree", Input.Validate.REQUIRED);
 
     public Input<Parameterization> parameterizationInput =
             new Input<>("parameterization", "ADB parameterization", Input.Validate.REQUIRED);
@@ -39,19 +39,19 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
     public void initAndValidate() {
         super.initAndValidate();
 
-        Tree tree = treeInput.get();
+        Tree branchingTree = branchingTreeInput.get();
         double scale = scaleInput.get();
         parameterization = parameterizationInput.get();
 
         // scale tree
         if (scale != 1.0) {
-            for (Node node : tree.getNodesAsArray()) {
+            for (Node node : branchingTree.getNodesAsArray()) {
                 node.setHeight(node.getHeight() * scale);
             }
         }
 
         // convert to AnnotatedTree
-        convertBranchingTree(tree);
+        convertBranchingTree(branchingTree);
 
         // parsimonous ancestral types
         if (parameterization.getNTypes() > 1) {
@@ -188,7 +188,7 @@ public class AnnotatedTreeInitialiser extends AnnotatedTree implements StateNode
     public void initStateNodes() { }
 
     @Override
-    public void getInitialisedStateNodes(List<StateNode> stateNodes) {
-        stateNodes.add(this);
+    public void getInitialisedStateNodes(List<StateNode> stateNodeList) {
+        stateNodeList.add(this);
     }
 }

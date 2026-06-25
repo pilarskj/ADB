@@ -3,7 +3,6 @@ package adb.operators;
 import adb.tree.AnnotatedNode;
 import adb.tree.AnnotatedNode.EventNode;
 import adb.tree.AnnotatedTree;
-import beast.base.evolution.operator.TreeOperator;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.util.InputUtil;
@@ -74,7 +73,7 @@ public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
         // TODO: extend to multi-type version
         if (parameterization != null && parameterization.getNTypes() == 1) {
             // calculate current branch probability
-            oldBranchProb = getBranchProbability((AnnotatedNode)i);
+            oldBranchProb = getBranchProbability((AnnotatedNode)i, true);
         } else {
             oldBranchProb = 0.0;
         }
@@ -130,7 +129,7 @@ public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
         // TODO: extend resampling events to multi-type version
         if (parameterization != null && parameterization.getNTypes() == 1) {
             // resample events along branch and calculate probability
-            newBranchProb = resampleEvents((AnnotatedNode)i);
+            newBranchProb = resampleEvents((AnnotatedNode)i, true);
             logHR += (newBranchProb - oldBranchProb);
         } else {
             ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newEventHeight); // only keep events below cut

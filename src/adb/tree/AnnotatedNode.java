@@ -57,11 +57,13 @@ public class AnnotatedNode extends Node {
     }
 
     public void setEvents(List<EventNode> events) {
+        //startEditing();
         this.events = events;
     }
 
     // restore event list with the node itself being the only event
     public void clearEvents() {
+        //startEditing();
         events.clear();
         events.add(new EventNode(getType(this), height));
     }
@@ -74,7 +76,10 @@ public class AnnotatedNode extends Node {
         return events.get(idx);
     }
 
-    public void setEvent(EventNode event, int idx) { events.set(idx, event); }
+    public void setEvent(EventNode event, int idx) {
+        //startEditing();
+        events.set(idx, event);
+    }
 
     public int getInitialType() { // past type
         return events.get(events.size() - 1).type;
@@ -85,6 +90,7 @@ public class AnnotatedNode extends Node {
     }
 
     public void setType(int type) {
+        //startEditing();
         events.get(0).setType(type);
     }
 
@@ -100,6 +106,7 @@ public class AnnotatedNode extends Node {
     }
 
     public void addEvent(EventNode event, boolean append) {
+        //startEditing();
         if (append) { // append at end
             events.add(event);
         } else { // find the correct spot
@@ -110,10 +117,12 @@ public class AnnotatedNode extends Node {
     }
 
     public void addEvent(EventNode event, int idx) { // add at given position, remaining entries will be shifted +1
+        //startEditing();
         events.add(idx, event);
     }
 
     public void addEvents(List<EventNode> events, boolean append) {
+        //startEditing();
         if (append) { // append at end
             this.events.addAll(events);
         } else { // find the correct spot
@@ -124,10 +133,12 @@ public class AnnotatedNode extends Node {
     }
 
     public void addEvents(List<EventNode> events, int ix) {
+        //startEditing();
         this.events.addAll(ix, events);
     }
 
     public void removeEvent(int idx) {
+        //startEditing();
         if (idx >= events.size())
             throw new IllegalArgumentException("Index to removeEvent() out of range.");
         events.remove(idx);
@@ -151,6 +162,7 @@ public class AnnotatedNode extends Node {
     }
 
     public void sortEvents() {
+        //startEditing();
         events.sort(comparator);
     }
 
@@ -215,6 +227,8 @@ public class AnnotatedNode extends Node {
 
     // re-distribute events according to Dirichlet distribution
     public void distributeEvents(double alpha, double origin) {
+        //startEditing();
+
         double[] segmentLengths = this.getWaitingTimes(origin); // TODO: special option for stem branch?
         Utils.distributeDirichlet(segmentLengths, alpha);
 

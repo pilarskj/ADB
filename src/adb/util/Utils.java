@@ -1,7 +1,8 @@
 package adb.util;
 
 import beast.base.util.Randomizer;
-import org.apache.commons.math.special.Gamma;
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.special.Gamma;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -231,6 +232,29 @@ public class Utils {
         double logDirichlet = Gamma.logGamma(n * alpha) - n * Gamma.logGamma(alpha) + (alpha - 1) * logP;
         // probability accounting for transformation
         return  -(n - 1) * Math.log(sumX) + logDirichlet;
+    }
+
+
+    public static int sampleDiscretizedNormal(double mean, double sd) {
+        double continuousSample = mean + Randomizer.nextGaussian() * sd;
+        // continuity correction
+        int discreteSample = (int) Math.round(continuousSample);
+        // truncate at 0
+        return Math.max(0, discreteSample);
+    }
+
+
+    public static double logProbabilityDiscretizedNormal(int k, double mean, double sd) {
+        NormalDistribution normal = new NormalDistribution(null, mean, sd);
+        double prob;
+        if (k == 0) {
+            // snatch everything to the left of 0.5 for the zero bin
+            prob = normal.cumulativeProbability(0.5);
+        } else {
+            // continuity correction bin: [k - 0.5, k + 0.5]
+            prob = normal.cumulativeProbability(k + 0.5) - normal.cumulativeProbability(k - 0.5);
+        }
+        return Math.log(prob);
     }
 
 

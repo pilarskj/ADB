@@ -2,28 +2,11 @@ package adb.distribution;
 
 import adb.distribution.LifetimeDistributions.*;
 import adb.util.Utils;
-import beast.base.core.Input;
-import beast.base.inference.CalculationNode;
 
 import java.util.stream.IntStream;
 
 
-public class P0System extends CalculationNode {
-
-    public Input<Parameterization> parameterizationInput =
-            new Input<>("parameterization", "ADB parameterization", Input.Validate.REQUIRED);
-
-    public Input<LifetimeDistributions> lifetimeDistributionsInput =
-            new Input<>("lifetimeDistributions", "", Input.Validate.REQUIRED);
-
-    public Input<Integer> maxIterationsInput =
-            new Input<>("maxIterations", "",Input.Validate.REQUIRED);
-    public Input<Double> toleranceInput =
-            new Input<>("tolerance", "", Input.Validate.REQUIRED);
-    public Input<double[]> timeArrayInput =
-            new Input<>("timeArray", "", Input.Validate.REQUIRED);
-    public Input<Double> timeStepInput =
-            new Input<>("timeStep", "", Input.Validate.REQUIRED);
+public class P0System {
 
     Parameterization parameterization;
     int nTypes;
@@ -42,26 +25,27 @@ public class P0System extends CalculationNode {
     double[][] storedP0;
 
 
-    @Override
-    public void initAndValidate() {
-        parameterization = parameterizationInput.get();
-        nTypes = parameterization.getNTypes();
-        lifetimeDistributions = lifetimeDistributionsInput.get();
+    public P0System(Parameterization parameterization, LifetimeDistributions lifetimeDistributions,
+                    int maxIt, double tol, double[] timeArray, double timeStep) {
+        this.parameterization = parameterization;
+        this.nTypes = parameterization.getNTypes();
+        this.lifetimeDistributions = lifetimeDistributions;
 
-        maxIt = maxIterationsInput.get();
-        tol = toleranceInput.get();
-        timeArray = timeArrayInput.get();
-        timeStep = timeStepInput.get();
-        nSteps = timeArray.length;
+        this.maxIt = maxIt;
+        this.tol = tol;
+        this.timeArray = timeArray;
+        this.timeStep = timeStep;
+        this.nSteps = timeArray.length;
 
         P0 = new double[nTypes][nSteps];
         storedP0 = new double[nTypes][nSteps];
         dirty = true;
-        calcP0();
+        solveP0();
+        dirty = false;
     }
 
 
-    private void calcP0() {
+    private void solveP0() {
 
         if (!dirty) return;
 
@@ -125,39 +109,41 @@ public class P0System extends CalculationNode {
 
         // set final
         P0 = X;
-        dirty = false;
     }
 
 
     public double[][] getP0() {
-        calcP0();
+        solveP0();
         return P0;
     }
 
 
-    @Override
-    public boolean requiresRecalculation() {
-        dirty = true;
-        return true;
+    protected void isDirty() {
+        if (parameterization.isDirtyCalculation()) {
+            dirty = true;
+        }
     }
 
 
-    @Override
     protected void store() {
         for (int i = 0; i < nTypes; i++) {
             System.arraycopy(P0[i], 0, storedP0[i], 0, nSteps);
         }
-        super.store();
+        dirty = false;
     }
 
 
-    @Override
     protected void restore() {
         double[][] tmp;
         tmp = P0;
         P0 = storedP0;
         storedP0 = tmp;
-        super.restore();
+
+        dirty = false;
     }
 
+
+    protected void accept() {
+        dirty = false;
+    }
 }

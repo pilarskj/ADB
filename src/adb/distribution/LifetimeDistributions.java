@@ -1,8 +1,6 @@
 package adb.distribution;
 
 import adb.util.Utils;
-import beast.base.core.Input;
-import beast.base.inference.CalculationNode;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.Parameter;
 import beast.base.inference.parameter.RealParameter;
@@ -14,21 +12,13 @@ import java.util.BitSet;
 import static adb.util.Utils.TRANSFORM_FORWARD;
 
 
-public class LifetimeDistributions extends CalculationNode {
-    // TODO: test storing/ restoring in MCMC
-
-    public Input<RealParameter> lifetimeParameterInput =
-            new Input<>("lifetime", "", Input.Validate.REQUIRED);
-    public Input<Parameter> shapeParameterInput =
-            new Input<>("shape", "", Input.Validate.REQUIRED);
-
-    public Input<double[]> timeArrayInput =
-             new Input<>("timeArray", "", Input.Validate.REQUIRED);
+public class LifetimeDistributions {
 
     RealParameter lifetimeParameter;
     Parameter shapeParameter;
     int nTypes;
     double[] timeArray;
+    int nSteps;
 
     // for identifying dirty indices
     boolean dirty;
@@ -73,21 +63,28 @@ public class LifetimeDistributions extends CalculationNode {
     }
 
 
-    @Override
-    public void initAndValidate() {
-        lifetimeParameter = lifetimeParameterInput.get();
-        shapeParameter = shapeParameterInput.get();
+    public LifetimeDistributions(RealParameter lifetimeParameter, Parameter shapeParameter, double[] timeArray) {
+        this.lifetimeParameter = lifetimeParameter;
+        this.shapeParameter = shapeParameter;
         nTypes = lifetimeParameter.getDimension();
-        timeArray = timeArrayInput.get();
+        this.timeArray = timeArray;
+        nSteps = timeArray.length;
 
         lifetimeDistributions = new LifetimeDistribution[nTypes];
         storedLifetimeDistributions = new LifetimeDistribution[nTypes];
 
+        /* for (int i = 0; i < nTypes; i++) {
+            lifetimeDistributions[i] = new LifetimeDistribution(
+                    lifetimeParameter.getArrayValue(i),
+                    shapeParameter.getArrayValue(i),
+                    new Complex[2 * nSteps],
+                    new double[nSteps]
+            );
+        } */
         // get all initial distributions
         dirty = true;
         dirtyIndices.set(0, nTypes);
         update();
-        dirtyIndices.clear();
 
         // copy to stored (avoid null)
         for (int i = 0; i < nTypes; i++) {
@@ -97,18 +94,20 @@ public class LifetimeDistributions extends CalculationNode {
                     lifetimeDistributions[i].pdfFFT,
                     lifetimeDistributions[i].cdf);
         }
+
+        dirtyIndices.clear();
+        dirty = false;
     }
 
 
     private void update() {
-        if (!dirty) return;
+
+        if (!dirty) { return; }
 
         // only update what actually changed!
         for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
             updateLifetimeDistribution(i);
         }
-
-        dirty = false;
     }
 
 
@@ -121,10 +120,9 @@ public class LifetimeDistributions extends CalculationNode {
         GammaDistribution gammaDist = new GammaDistribution(shape, scale);
 
         // calculate PDF and CDF on given array
-        int n = timeArray.length;
-        double[] pdf = new double[n];
-        double[] cdf = new double[n];
-        for (int i = 0; i < n; i++) {
+        double[] pdf = new double[nSteps];
+        double[] cdf = new double[nSteps];
+        for (int i = 0; i < nSteps; i++) {
             pdf[i] = Math.exp(gammaDist.logDensity(timeArray[i])); // use log to prevent underflow
             cdf[i] = gammaDist.cumulativeProbability(timeArray[i]);
         }
@@ -143,8 +141,7 @@ public class LifetimeDistributions extends CalculationNode {
     }
 
 
-    @Override
-    protected boolean requiresRecalculation() {
+    protected void findDirty() {
         for (int i = 0; i < nTypes; i++) {
             if (lifetimeParameter.isDirty(i)) { // Note: for some reason shapeParameter.isDirty(i) does not work!
                 dirtyIndices.set(i); // mark this index as needing a store/restore
@@ -160,39 +157,30 @@ public class LifetimeDistributions extends CalculationNode {
             }
         }
         dirty = true;
-        return true;
     }
 
 
-    @Override
     protected void store() {
-        // only iterate over bits that are set to true
-        for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
+        for (int i = 0; i < nTypes; i++) {
             storedLifetimeDistributions[i].copyFrom(lifetimeDistributions[i]);
         }
-        super.store();
+        dirtyIndices.clear();
+        dirty = false;
     }
 
 
-    @Override
     protected void restore() {
+        // only iterate over bits that are set to true
         for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
             lifetimeDistributions[i].copyFrom(storedLifetimeDistributions[i]);
         }
         dirtyIndices.clear();
-        super.restore();
+        dirty = false;
     }
 
 
-    // TODO: necessary? -- check clearing of dirtyIndices
-    @Override
     protected void accept() {
-        /* for (int i = dirtyIndices.nextSetBit(0); i >= 0; i = dirtyIndices.nextSetBit(i+1)) {
-            storedLifetimes[i] = lifetimeParameter.getArrayValue(i);
-            storedShapes[i] = shapeParameter.getArrayValue(i);
-            storedLifetimeDistributions[i].copyFrom(lifetimeDistributions[i]);
-        } */
         dirtyIndices.clear();
-        super.accept();
+        dirty = false;
     }
 }

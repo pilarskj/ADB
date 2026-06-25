@@ -38,56 +38,11 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
 
 
     // TODO: extend to multi-type branches
-    // only makes sense for internal branches
-    protected double redistributeEvents(AnnotatedNode node) {
-
-        double shape = parameterization.getShape(0);
-        double origin;
-
-        if (node.isLeaf()) {
-            return Double.NEGATIVE_INFINITY;
-        } else {
-            if (node.isRoot()) {
-                if (parameterization.getOriginTime() == null) {
-                    return 0.0; // TODO: correct?
-                } else {
-                    origin = parameterization.getOriginTime();
-                }
-            } else {
-                origin = node.getParent().getHeight();
-            }
-            return redistributeEvents(node, origin, shape);
-        }
-    }
-
-
-    private double redistributeEvents(AnnotatedNode node, double origin, double shape) {
-        // TODO: align with distributeEvents function in AnnotatedNode?
-        int n = node.getEventCount();
-        double[] segmentLengths = new double[n];
-
-        for (int i = 0; i < (n - 1); i++) {
-            segmentLengths[i] = node.getEvent(i + 1).getHeight() - node.getEvent(i).getHeight();
-        }
-        segmentLengths[n - 1] = origin - node.getEvent(n - 1).getHeight();
-        double logp = Utils.distributeDirichletProbability(segmentLengths, shape);
-
-        double height = node.getHeight();
-        for (int i = 0; i < (n - 1); i++) {
-            height = height + segmentLengths[i];
-            node.getEvent(i + 1).setHeight(height);
-        }
-
-        return logp;
-    }
-
-
-    protected double resampleEvents(AnnotatedNode node) {
+    protected double resampleEvents(AnnotatedNode node, boolean drawEventCount) {
 
         double lifetime = parameterization.getLifetime(0);
         double shape = parameterization.getShape(0);
-        double rate = shape / lifetime;
-        GammaDistribution gammaDist = new GammaDistribution(shape, 1/rate);
+        double scale = lifetime / shape;
 
         // clear current events
         int n = node.getEventCount();
@@ -109,11 +64,12 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
         }
 
         if (node.isLeaf()) {
+            GammaDistribution gammaDist = new GammaDistribution(null, shape, scale);
             t = tMax;
             double waitingTime;
             while (t > tMin) { // tMin should be 0 in this case!
                 // determine the next hidden event
-                waitingTime = Randomizer.nextGamma(shape, rate);
+                waitingTime = Randomizer.nextGamma(shape, 1/scale);
                 t -= waitingTime;
                 if (t > tMin) {
                     // add new hidden event
@@ -133,9 +89,20 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
         } else {
             // sample events
             double length = tMax - tMin;
-            //int eventCount = n;
-            int eventCount = (int) Randomizer.nextPoisson(length/lifetime);
-            logp += (new PoissonDistribution(length/lifetime)).logProbability(eventCount);
+            int eventCount;
+            if (drawEventCount) {
+                // use CLT for renewal processes: approximate number of events with discretized normal distribution
+                double mean = length / lifetime;
+                double variance = ((shape * (scale * scale)) * length) / Math.pow(lifetime, 3);
+                double sd = Math.sqrt(variance);
+                eventCount = Utils.sampleDiscretizedNormal(mean, sd);
+                logp += Utils.logProbabilityDiscretizedNormal(eventCount, mean, sd);
+                //eventCount = (int) Randomizer.nextPoisson(length/lifetime);
+                //logp += (new PoissonDistribution(length/lifetime)).logProbability(eventCount);
+            } else {
+                eventCount = n;
+            }
+
             if (eventCount > 1) {
                 double[] segmentLengths = new double[eventCount];
                 Arrays.fill(segmentLengths, length/eventCount);
@@ -154,11 +121,11 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
     }
 
 
-    protected double getBranchProbability(AnnotatedNode node) {
+    protected double getBranchProbability(AnnotatedNode node, boolean drawEventCount) {
         double lifetime = parameterization.getLifetime(0);
         double shape = parameterization.getShape(0);
         double scale = lifetime / shape;
-        GammaDistribution gammaDist = new GammaDistribution(shape, scale);
+        GammaDistribution gammaDist = new GammaDistribution(null, shape, scale);
 
         double logp = 0;
         double tMax;
@@ -192,7 +159,13 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
 
         } else {
             double length = tMax - node.getHeight();
-            logp += (new PoissonDistribution(length/lifetime)).logProbability(eventCount);
+            if (drawEventCount) {
+                double mean = length / lifetime;
+                double variance = ((shape * (scale * scale)) * length) / Math.pow(lifetime, 3);
+                double sd = Math.sqrt(variance);
+                logp += Utils.logProbabilityDiscretizedNormal(eventCount, mean, sd);
+                //logp += (new PoissonDistribution(length/lifetime)).logProbability(eventCount);
+            }
             double logDirichlet = 0;
             for (int i = 1; i < eventCount; i++) {
                 waitingTime = node.getEvent(i).getHeight() - node.getEvent(i - 1).getHeight();

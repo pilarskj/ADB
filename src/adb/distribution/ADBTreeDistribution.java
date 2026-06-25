@@ -10,6 +10,7 @@ import beast.base.core.Input;
 import beast.base.core.Log;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
+import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
 
@@ -144,24 +145,21 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             timeArray = Utils.linSpace(0, tree.getRoot().getHeight(), nSteps);
         }
 
-        // initialize internal calculation nodes
-        lifetimeDistributions = new LifetimeDistributions();
-        lifetimeDistributions.init(
+        // initialize internal calculations
+        lifetimeDistributions = new LifetimeDistributions(
                 parameterization.getLifetimeParameter(),
                 parameterization.getShapeParameter(),
                 timeArray
         );
 
-        P0System = new P0System();
-        P0System.init(
+        P0System = new P0System(
                 parameterization,
                 lifetimeDistributions,
                 maxIt, tol, timeArray, timeStep
         );
 
         if (!(tree instanceof AnnotatedTree)) { // TODO: or xml input tag?
-            P1System = new P1System();
-            P1System.init(
+            P1System = new P1System(
                     parameterization,
                     lifetimeDistributions,
                     P0System,
@@ -203,7 +201,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             double lifetime = parameterization.getLifetime(i);
             double shape = parameterization.getShape(i);
             double scale = lifetime / shape;
-            gammaDistributions.put(i, new GammaDistribution(shape, scale));
+            gammaDistributions.put(i, new GammaDistribution(null, shape, scale));
         }
 
         // extend time array to calculate probabilities of tiny branches
@@ -272,6 +270,8 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         }
 
         logL = treeFactor + conditionFactor + logL;
+        //Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
+        //System.out.println(flatTree.getRoot().toNewick());
         return logL;
     }
 
@@ -555,7 +555,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             if (gammaCache.containsKey(i + 1)) {
                 gammaDist = gammaCache.get(i + 1);
             } else { // otherwise, add it
-                gammaDist = new GammaDistribution((i + 1) * shape, scale);
+                gammaDist = new GammaDistribution(null, (i + 1) * shape, scale);
                 gammaCache.put(i + 1, gammaDist);
             }
             term = Math.pow(2, i) * Math.pow(1 - parameterization.getDeath(0), i + 1) * Math.pow(P0M, i) * Math.exp(gammaDist.logDensity(end - start));
@@ -564,6 +564,49 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         }
 
         return density;
+    }
+
+
+    @Override
+    public boolean requiresRecalculation() {
+        lifetimeDistributions.findDirty();
+        P0System.isDirty();
+        if (!(tree instanceof AnnotatedTree)) {
+            P1System.isDirty();
+        }
+        return true;
+    }
+
+
+    @Override
+    public void store() {
+        lifetimeDistributions.store();
+        P0System.store();
+        if (!(tree instanceof AnnotatedTree)) {
+            P1System.store();
+        }
+        super.store();
+    }
+
+
+    @Override
+    public void restore() {
+        lifetimeDistributions.restore();
+        P0System.restore();
+        if (!(tree instanceof AnnotatedTree)) {
+            P1System.restore();
+        }
+        super.restore();
+    }
+
+    @Override
+    public void accept() {
+        lifetimeDistributions.accept();
+        P0System.accept();
+        if (!(tree instanceof AnnotatedTree)) {
+            P1System.accept();
+        }
+        super.accept();
     }
 
 }
