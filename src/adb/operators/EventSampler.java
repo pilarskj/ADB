@@ -33,7 +33,7 @@ public class EventSampler extends AnnotatedTreeOperator {
         for (Node node : tree.getNodesAsArray()) {
             oldBranchProb = getBranchProbability((AnnotatedNode)node, drawEventCount);
             newBranchProb = resampleEvents((AnnotatedNode)node, drawEventCount);
-            logHR += (newBranchProb - oldBranchProb);
+            logHR += (oldBranchProb - newBranchProb);
         }
 
         // for testing

@@ -12,7 +12,9 @@ import org.apache.commons.math3.transform.TransformType;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class Utils {
 
@@ -239,17 +241,17 @@ public class Utils {
         double continuousSample = mean + Randomizer.nextGaussian() * sd;
         // continuity correction
         int discreteSample = (int) Math.round(continuousSample);
-        // truncate at 0
-        return Math.max(0, discreteSample);
+        // truncate at 1
+        return Math.max(1, discreteSample);
     }
 
 
     public static double logProbabilityDiscretizedNormal(int k, double mean, double sd) {
         NormalDistribution normal = new NormalDistribution(null, mean, sd);
         double prob;
-        if (k == 0) {
-            // snatch everything to the left of 0.5 for the zero bin
-            prob = normal.cumulativeProbability(0.5);
+        if (k == 1) {
+            // fold the zero bin into the first admissible event count
+            prob = normal.cumulativeProbability(1.5);
         } else {
             // continuity correction bin: [k - 0.5, k + 0.5]
             prob = normal.cumulativeProbability(k + 0.5) - normal.cumulativeProbability(k - 0.5);
@@ -258,16 +260,27 @@ public class Utils {
     }
 
 
-    public static void saveArrays(double[] x, double[] y, int thin, String header, String fileName) {
+    // for testing: all arrays must be of the same length!
+    public static void saveArrays(List<double[]> arrays, int thin, String header, String fileName) {
+
+        int length = arrays.get(0).length;
+
         try (PrintWriter writer = new PrintWriter(new FileWriter(fileName))) {
             writer.println(header);
 
-            for (int i = 0; i < x.length; i += thin) {
-                writer.printf("%.6f,%.6f%n", x[i], y[i]);
+            for (int i = 0; i < length; i += thin) {
+                for (int j = 0; j < arrays.size(); j++) {
+                    writer.printf("%.6f", arrays.get(j)[i]);
+
+                    // print a comma after every column except the very last one
+                    if (j < arrays.size() - 1) {
+                        writer.print(",");
+                    }
+                }
+                writer.println();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
 }
