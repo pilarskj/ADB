@@ -116,6 +116,8 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
             }
         }
 
+        node.makeAllDirty(Tree.IS_DIRTY);
+
         // return probability
         return logp;
     }

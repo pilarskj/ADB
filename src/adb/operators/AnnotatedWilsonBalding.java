@@ -2,7 +2,6 @@ package adb.operators;
 
 import adb.tree.AnnotatedNode;
 import adb.tree.AnnotatedNode.EventNode;
-import adb.tree.AnnotatedTree;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.util.InputUtil;
@@ -91,7 +90,7 @@ public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
         replace(jP, j, p);
 
         // mark paths to common ancestor as changed
-        if(markCladesInput.get()) {
+        if (markCladesInput.get()) {
             Node iup = pP;
             Node jup = p;
             while (iup != jup) {
@@ -130,14 +129,11 @@ public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
         if (parameterization != null && parameterization.getNTypes() == 1) {
             // resample events along branch and calculate probability
             newBranchProb = resampleEvents((AnnotatedNode)i, true);
-            logHR += (newBranchProb - oldBranchProb);
+            logHR += (oldBranchProb - newBranchProb);
         } else {
             ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newEventHeight); // only keep events below cut
         }
 
-        // for testing
-        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
-        System.out.println(flatTree.getRoot().toNewick());
         return logHR;
     }
 

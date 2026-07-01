@@ -2,9 +2,7 @@ package adb.operators;
 
 import adb.tree.AnnotatedNode;
 import adb.tree.AnnotatedNode.EventNode;
-import adb.tree.AnnotatedTree;
 import beast.base.core.Input;
-import beast.base.evolution.operator.TreeOperator;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.inference.util.InputUtil;
@@ -32,11 +30,11 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
     public double proposal() {
 
         Tree tree = (Tree) InputUtil.get(treeInput, this);
+        final boolean markClades = markCladesInput.get();
 
-        double logHR;
+        double newHeight, oldBranchProb = 0.0, newBranchProb, logHR = 0.0;
 
         Node i;
-        final boolean markClades = markCladesInput.get();
         // 1. choose a random node avoiding root
         final int nodeCount = tree.getNodeCount();
         if (nodeCount == 1) {
@@ -57,14 +55,16 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
             delta = Randomizer.nextInt(2 * size + 1) - size;
         } while (delta == 0);
 
-        double oldHeight = p.getHeight();
-        double newHeight;
+
+        if (parameterization != null && parameterization.getNTypes() == 1) {
+            oldBranchProb = getBranchProbability((AnnotatedNode) i, true);
+        }
 
         // 3. perform move
         // 3.1 if the move is up
         if (delta > 0) {
 
-            if (delta == ((AnnotatedNode) p).getEventCount()) {
+            if (delta == ((AnnotatedNode)p).getEventCount()) {
                 // no shift possible
                 return Double.NEGATIVE_INFINITY;
 
@@ -79,11 +79,10 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 // find new parent
                 Node newParent = PiP;
                 Node newChild = p;
-                // store events along the path
-                List<EventNode> eventPath = new ArrayList<>();
+                // store events from the old parent branch
+                List<EventNode> pEvents = new ArrayList<>(((AnnotatedNode)p).getEvents());
                 int x = 0;
                 for (int k = 0; k < delta; k++) {
-                    eventPath.add(((AnnotatedNode)newChild).getEvent(x));
                     x++;
                     if (x >= ((AnnotatedNode)newChild).getEventCount()) {
                         x = 0; // restore counter
@@ -111,11 +110,10 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 // update topology and event lists
                 replace(p, CiP, newChild);
                 replace(PiP, p, CiP);
-                ((AnnotatedNode)i).addEvents(eventPath, true);
-                ((AnnotatedNode)CiP).addEvents(((AnnotatedNode)p).getEvents(), true);
-                List<EventNode> newParentEvents = ((AnnotatedNode)newChild).getEvents().subList(x, ((AnnotatedNode) newChild).getEventCount());
-                ((AnnotatedNode)p).setEvents(newParentEvents);
-                newParentEvents.clear();
+                ((AnnotatedNode)CiP).addEvents(pEvents, true);
+                List<EventNode> events = ((AnnotatedNode)newChild).getEvents().subList(x, ((AnnotatedNode)newChild).getEventCount());
+                ((AnnotatedNode)p).setEvents(new ArrayList<>(events));
+                events.clear();
 
                 // creating a new root
                 if (isRoot) {
@@ -129,31 +127,23 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 }
 
                 // count the hypothetical sources of this destination
-                int possibleSources = intersectingEdges(newChild, oldHeight, null);
-                logHR = -Math.log(possibleSources);
+                int possibleSources = intersectingEdges(newChild, delta, null);
+                logHR += -Math.log(possibleSources);
 
 
             // 3.1.2 if topology does not change
             } else {
                 newHeight = ((AnnotatedNode)p).getEvent(delta).getHeight();
                 p.setHeight(newHeight);
-                // copy events from parent branch to both children
-                List<EventNode> pEvents = ((AnnotatedNode)p).getEvents().subList(0, delta);
-                ((AnnotatedNode)i).addEvents(pEvents, true);
-                ((AnnotatedNode)CiP).addEvents(pEvents, true);
-                pEvents.clear();
-                logHR = 0.0;
+                // copy events from parent branch to sibling
+                List<EventNode> events = ((AnnotatedNode)p).getEvents().subList(0, delta);
+                ((AnnotatedNode)CiP).addEvents(new ArrayList<>(events), true);
+                events.clear();
             }
 
 
         // 3.2 if the move is down
         } else {
-
-            int nEvents = ((AnnotatedNode)i).getEventCount();
-            if (Math.abs(delta) >= nEvents) {
-                // invalid move (slide below i)
-                return Double.NEGATIVE_INFINITY;
-            }
 
             if (Math.abs(delta) == ((AnnotatedNode)CiP).getEventCount()) {
                 // no shift possible
@@ -162,15 +152,8 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
             // 3.2.1 if topology changes
             } else if (Math.abs(delta) > ((AnnotatedNode)CiP).getEventCount()) {
 
-                // get events along the path
-                List<EventNode> eventPath = new ArrayList<>(
-                        ((AnnotatedNode)i).getEvents().subList(nEvents + delta, nEvents)
-                );
-
-                newHeight = eventPath.get(0).getHeight();
-
                 List<Node> newChildren = new ArrayList<>();
-                int possibleDestinations = intersectingEdges(CiP, newHeight, newChildren);
+                int possibleDestinations = intersectingEdges(CiP, Math.abs(delta), newChildren);
 
                 // if no valid destinations then return a failure
                 if (newChildren.size() == 0) {
@@ -181,6 +164,13 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 int childIndex = Randomizer.nextInt(newChildren.size());
                 Node newChild = newChildren.get(childIndex);
                 Node newParent = newChild.getParent();
+                int eventIndex = eventIndexForDownMove(CiP, newChild, Math.abs(delta));
+                newHeight = ((AnnotatedNode)newChild).getEvent(eventIndex).getHeight();
+
+                // TODO: potentially also add some margin around i's height
+                if (newHeight < i.getHeight()) {
+                    return Double.NEGATIVE_INFINITY;
+                }
 
                 // if p was root
                 if (p.isRoot()) {
@@ -199,10 +189,9 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
 
                 // event lists
                 ((AnnotatedNode)CiP).addEvents(((AnnotatedNode)p).getEvents(), true);
-                ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newHeight); // only keep events below cut
-                ((AnnotatedNode)newChild).getEvents().removeIf(e -> e.getHeight() >= newHeight);
-                eventPath.removeIf(e -> e.getHeight() >= newParent.getHeight()); // only keep events below newParent
-                ((AnnotatedNode)p).setEvents(eventPath);
+                List<EventNode> events = ((AnnotatedNode)newChild).getEvents().subList(eventIndex, ((AnnotatedNode)newChild).getEventCount());
+                ((AnnotatedNode)p).setEvents(new ArrayList<>(events));
+                events.clear();
 
                 p.setHeight(newHeight);
                 if (markClades) {
@@ -214,52 +203,70 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                     }
                 }
 
-                logHR = Math.log(possibleDestinations);
+                logHR += Math.log(possibleDestinations);
 
 
             // 3.2.2 if topology does not change
             } else {
-                int ix = ((AnnotatedNode)i).getEventCount() + delta; // delta is negative!
-                newHeight =  ((AnnotatedNode)i).getEvents().get(ix).getHeight();
+                int ix = ((AnnotatedNode)CiP).getEventCount() + delta; // delta is negative!
+                newHeight = ((AnnotatedNode)CiP).getEvents().get(ix).getHeight();
+                if (newHeight < i.getHeight()) {
+                    return Double.NEGATIVE_INFINITY;
+                }
                 p.setHeight(newHeight);
+
                 // copy events from slide to parent branch, remove events from children
-                List<EventNode> events = ((AnnotatedNode)i).getEvents().subList(ix, ((AnnotatedNode)i).getEventCount());
-                ((AnnotatedNode)p).addEvents(events,0);
+                List<EventNode> events = ((AnnotatedNode)CiP).getEvents().subList(ix, ((AnnotatedNode)CiP).getEventCount());
+                ((AnnotatedNode)p).addEvents(new ArrayList<>(events), 0);
                 events.clear();
-                ((AnnotatedNode)CiP).getEvents().removeIf(e -> e.getHeight() >= newHeight);
-                logHR = 0.0;
             }
         }
 
-        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
-        System.out.println(flatTree.getRoot().toNewick());
+        // TODO: extend resampling events to multi-type version
+        if (parameterization != null && parameterization.getNTypes() == 1) {
+            // resample events along branch and calculate probability
+            newBranchProb = resampleEvents((AnnotatedNode)i, true);
+            logHR += (oldBranchProb - newBranchProb);
+        } else {
+            ((AnnotatedNode)i).getEvents().removeIf(e -> e.getHeight() >= newHeight);
+        }
+
         return logHR;
     }
 
 
-    // copied from regular proposal
-    private int intersectingEdges(Node node, double height, List<Node> directChildren) {
-        final Node parent = node.getParent();
-
-        if (parent == null) {
-            // can happen with non-standard non-mutable trees
+    private int intersectingEdges(Node node, int eventCount, List<Node> directChildren) {
+        if (node.getParent() == null) {
             return 0;
         }
 
-        if (parent.getHeight() < height) return 0;
-
-        if (node.getHeight() < height) {
+        int nodeEventCount = ((AnnotatedNode)node).getEventCount();
+        if (eventCount < nodeEventCount) {
             if (directChildren != null) directChildren.add(node);
             return 1;
         }
 
-        if (node.isLeaf()) {
+        if (eventCount == nodeEventCount || node.isLeaf()) {
             return 0;
-        } else {
-            final int count = intersectingEdges(node.getLeft(), height, directChildren) +
-                    intersectingEdges(node.getRight(), height, directChildren);
-            return count;
         }
+
+        int remainingEventCount = eventCount - nodeEventCount;
+        return intersectingEdges(node.getLeft(), remainingEventCount, directChildren) +
+                intersectingEdges(node.getRight(), remainingEventCount, directChildren);
+    }
+
+
+    private int eventIndexForDownMove(Node source, Node destination, int eventCount) {
+        Node node = destination;
+        int eventsBeforeDestination = ((AnnotatedNode)source).getEventCount();
+
+        while (node.getParent() != source) {
+            node = node.getParent();
+            eventsBeforeDestination += ((AnnotatedNode)node).getEventCount();
+        }
+
+        int eventsOnDestination = eventCount - eventsBeforeDestination;
+        return ((AnnotatedNode)destination).getEventCount() - eventsOnDestination;
     }
 
 }
