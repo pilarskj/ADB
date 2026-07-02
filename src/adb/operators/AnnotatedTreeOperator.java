@@ -8,7 +8,6 @@ import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.evolution.operator.TreeOperator;
 import beast.base.evolution.tree.Tree;
-import beast.base.inference.util.InputUtil;
 import beast.base.util.Randomizer;
 import org.apache.commons.math.special.Gamma;
 import org.apache.commons.math3.distribution.GammaDistribution;
@@ -28,7 +27,7 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
     @Override
     public void initAndValidate() {
 
-        Tree tree = (Tree) InputUtil.get(treeInput, this);
+        Tree tree = treeInput.get();
         if (!(tree instanceof AnnotatedTree)) {
             throw new IllegalArgumentException("Attempted to initialise annotated tree operator with regular tree.");
         }
@@ -116,7 +115,7 @@ public abstract class AnnotatedTreeOperator extends TreeOperator {
             }
         }
 
-        node.makeAllDirty(Tree.IS_DIRTY);
+        node.makeAllDirty(Tree.IS_DIRTY); // TODO: necessary here?
 
         // return probability
         return logp;

@@ -109,21 +109,13 @@ public class AnnotatedWilsonBalding extends AnnotatedTreeOperator {
         // update height
         p.setHeight(newEventHeight);
 
-        // segregate events
-        // collect events below cut (will remain for node j) and above cut (will be transferred to node p)
-        List<EventNode> jEventsBelow = new ArrayList<>();
-        List<EventNode> jEventsAbove = new ArrayList<>();
-        for (EventNode e : ((AnnotatedNode)j).getEvents()) {
-            if (e.getHeight() < newEventHeight) {
-                jEventsBelow.add(e);
-            } else {
-                jEventsAbove.add(e);
-            }
-        }
-
-        ((AnnotatedNode)CiP).addEvents(((AnnotatedNode)p).getEvents(), true); // join lists for CiP and p
-        ((AnnotatedNode)p).setEvents(jEventsAbove);
-        ((AnnotatedNode)j).setEvents(jEventsBelow);
+        // update events
+        List<EventNode> pEvents = ((AnnotatedNode)p).getEvents();
+        ((AnnotatedNode)CiP).addEvents(new ArrayList<>(pEvents), true);
+        // keep events below cut for node j and transfer events above cut to node p
+        List<EventNode> events = ((AnnotatedNode)j).getEvents().subList(newEventNr, ((AnnotatedNode)j).getEventCount());
+        ((AnnotatedNode)p).setEvents(new ArrayList<>(events));
+        events.clear();
 
         // TODO: extend resampling events to multi-type version
         if (parameterization != null && parameterization.getNTypes() == 1) {

@@ -383,8 +383,7 @@ public class AnnotatedTree extends Tree {
         root.setHeight(otherNodes[rootNr].getHeight());
         root.setParent(null);
 
-        AnnotatedNode aRoot = (AnnotatedNode)root;
-        aRoot.events.clear();
+        ((AnnotatedNode)root).assignEventsFrom((AnnotatedNode)otherNodes[rootNr]);
 
         if (otherNodes[rootNr].getLeft() != null) {
             root.setLeft(m_nodes[otherNodes[rootNr].getLeft().getNr()]);
@@ -408,8 +407,7 @@ public class AnnotatedTree extends Tree {
             AnnotatedNode src = (AnnotatedNode)otherNodes[i];
             sink.setHeight(src.getHeight());
             sink.setParent(m_nodes[src.getParent().getNr()]);
-            sink.events.clear();
-            sink.events.addAll(src.events);
+            sink.assignEventsFrom(src);
             if (src.getLeft() != null) {
                 sink.setLeft(m_nodes[src.getLeft().getNr()]);
                 if (src.getRight() != null) {
@@ -429,6 +427,7 @@ public class AnnotatedTree extends Tree {
         storeNodes(0, rootNr);
 
         storedRoot.setHeight(m_nodes[rootNr].getHeight());
+        ((AnnotatedNode)storedRoot).assignEventsFrom((AnnotatedNode)m_nodes[rootNr]);
         storedRoot.setParent(null);
         if (root.getLeft() != null) {
             storedRoot.setLeft(m_storedNodes[root.getLeft().getNr()]);
@@ -441,9 +440,6 @@ public class AnnotatedTree extends Tree {
             storedRoot.setRight(null);
         }
 
-        AnnotatedNode aStoredRoot = (AnnotatedNode)storedRoot;
-        aStoredRoot.events.clear();
-        aStoredRoot.events.addAll(((AnnotatedNode)m_nodes[rootNr]).events);
         storeNodes(rootNr + 1, nodeCount);
     }
 
@@ -463,8 +459,7 @@ public class AnnotatedTree extends Tree {
                 else
                     sink.setRight(null);
             }
-            sink.events.clear();
-            sink.events.addAll(src.events);
+            sink.assignEventsFrom(src);
         }
     }
 
@@ -479,6 +474,7 @@ public class AnnotatedTree extends Tree {
         Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false); // TODO: depends on the number of types!
         // String newick = flatTree.getRoot().toSortedNewick(new int[1], true); // TODO: use toSortedNewick
         String newick = flatTree.getRoot().toNewick();
+        // String newick = tree.getRoot().toSortedNewick(new int[1], true);
         out.print(newick);
         out.print(";");
     }

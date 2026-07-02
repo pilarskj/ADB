@@ -49,6 +49,10 @@ public class AnnotatedNode extends Node {
         public void setHeight(double height) {
             this.height = height;
         }
+
+        public EventNode copy() {
+            return new EventNode(type, height);
+        }
     }
 
 
@@ -57,6 +61,10 @@ public class AnnotatedNode extends Node {
     }
 
     public void setEvents(List<EventNode> events) {
+        if (events.isEmpty()) {
+            throw new IllegalStateException("AnnotatedNode cannot have an empty event list!");
+        }
+
         startEditing();
         this.events = events;
     }
@@ -144,10 +152,10 @@ public class AnnotatedNode extends Node {
         events.remove(idx);
     }
 
-    // binary search to find the index of the first event above some height threshold
+    // binary search to find the index of the first hidden event above some height threshold
     public int findEventAbove(double height) {
         int ix = events.size();
-        int min = 0;
+        int min = 1;
         int max = events.size() - 1;
         while (min <= max) {
             int mid = (min + max) / 2;
@@ -261,6 +269,13 @@ public class AnnotatedNode extends Node {
         }
     }
 
+    // deep copy of events
+    public void assignEventsFrom(AnnotatedNode node) {
+        events.clear();
+        for (EventNode event : node.events) {
+            events.add(event.copy());
+        }
+    }
 
     /**
      * ************************ *
@@ -278,10 +293,7 @@ public class AnnotatedNode extends Node {
         metaDataString = node.metaDataString;
         parent = null;
         ID = node.getID();
-
-        AnnotatedNode aNode = (AnnotatedNode)node;
-        events.clear();
-        events.addAll(aNode.events);
+        assignEventsFrom((AnnotatedNode)node);
 
         if (node.getLeft() != null) {
             setLeft(nodes[node.getLeft().getNr()]);
@@ -306,7 +318,10 @@ public class AnnotatedNode extends Node {
         node.metaDataString = metaDataString;
         node.parent = null;
         node.ID = ID;
-        node.events.addAll(events);
+        node.events = new ArrayList<>();
+        for (EventNode e : events) {
+            node.events.add(e.copy());
+        }
         if (getLeft() != null) {
             node.setLeft(getLeft().copy());
             node.getLeft().setParent(node);

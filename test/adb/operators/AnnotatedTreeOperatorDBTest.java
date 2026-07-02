@@ -79,7 +79,7 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
 
             @Override
             protected TreeOperator getOperator(Tree tree) {
-                return getAnnotatedWideExchange(tree);  // change here operator for testing
+                return getAnnotatedScale(tree);  // change here operator for testing
             }
         });
     }
@@ -97,7 +97,7 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
 
             @Override
             protected TreeOperator getOperator(Tree tree) {
-                return getAnnotatedWilsonBalding(tree); // change here operator for testing
+                return getAnnotatedScale(tree); // change here operator for testing
             }
         });
     }
@@ -227,6 +227,12 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
     protected TreeOperator getAnnotatedSubtreeSlide(Tree tree) {
         AnnotatedSubtreeSlide operator = new AnnotatedSubtreeSlide();
         operator.initByName("tree", tree, "parameterization", parameterization, "size", 10, "weight", 1.0);
+        return operator;
+    }
+
+    protected TreeOperator getAnnotatedScale(Tree tree) {
+        AnnotatedScale operator = new AnnotatedScale();
+        operator.initByName("tree", tree, "parameterization", parameterization, "drawEvents", true, "weight", 1.0);
         return operator;
     }
 

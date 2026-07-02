@@ -57,8 +57,11 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
 
 
         if (parameterization != null && parameterization.getNTypes() == 1) {
-            oldBranchProb = getBranchProbability((AnnotatedNode) i, true);
+            oldBranchProb = getBranchProbability((AnnotatedNode)i, true);
         }
+
+        // store events from the old parent branch
+        List<EventNode> pEvents = ((AnnotatedNode)p).getEvents();
 
         // 3. perform move
         // 3.1 if the move is up
@@ -79,8 +82,7 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 // find new parent
                 Node newParent = PiP;
                 Node newChild = p;
-                // store events from the old parent branch
-                List<EventNode> pEvents = new ArrayList<>(((AnnotatedNode)p).getEvents());
+
                 int x = 0;
                 for (int k = 0; k < delta; k++) {
                     x++;
@@ -110,7 +112,7 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 // update topology and event lists
                 replace(p, CiP, newChild);
                 replace(PiP, p, CiP);
-                ((AnnotatedNode)CiP).addEvents(pEvents, true);
+                ((AnnotatedNode)CiP).addEvents(new ArrayList<>(pEvents), true);
                 List<EventNode> events = ((AnnotatedNode)newChild).getEvents().subList(x, ((AnnotatedNode)newChild).getEventCount());
                 ((AnnotatedNode)p).setEvents(new ArrayList<>(events));
                 events.clear();
@@ -188,7 +190,7 @@ public class AnnotatedSubtreeSlide extends AnnotatedTreeOperator {
                 }
 
                 // event lists
-                ((AnnotatedNode)CiP).addEvents(((AnnotatedNode)p).getEvents(), true);
+                ((AnnotatedNode)CiP).addEvents(new ArrayList<>(pEvents), true);
                 List<EventNode> events = ((AnnotatedNode)newChild).getEvents().subList(eventIndex, ((AnnotatedNode)newChild).getEventCount());
                 ((AnnotatedNode)p).setEvents(new ArrayList<>(events));
                 events.clear();

@@ -13,6 +13,7 @@ public class AnnotatedTreeOperatorTest {
 
     String newick = "(((((((5:0.704651623):0.9815616586):0.9724532301):1.076834454):1.249319317,((((2:0.7965609946):1.052640805):0.9526174057):1.110375181,(((3:0.7945840806):1.02083498):1.106252391):0.9905229342):1.072625896):0.904531321,(((((4:0.7883689605):1.024284023):0.9996663794,((1:0.9184522562):0.9222398679):0.9716272388):0.9727550889):1.034266685):1.070010466):1.036790172):0.9334925396;";
     AnnotatedTreeParser tree;
+    RealParameter lifetime;
     Parameterization model;
     Tree flatTree;
     double logHR;
@@ -21,9 +22,11 @@ public class AnnotatedTreeOperatorTest {
     public void setUp() {
         tree = new AnnotatedTreeParser();
         tree.initByName("newick", newick);
+        lifetime = new RealParameter("1");
+        lifetime.setBounds(0.0, Double.POSITIVE_INFINITY);
         model = new Parameterization();
         model.initByName("nTypes", 1,
-                "lifetime", new RealParameter("1"),
+                "lifetime", lifetime,
                 "shape", new IntegerParameter("10"),
                 "death", new RealParameter("0.1"),
                 "sampling", new RealParameter("0.1"),
@@ -85,6 +88,17 @@ public class AnnotatedTreeOperatorTest {
         // initialize operator
         AnnotatedSubtreeSlide operator = new AnnotatedSubtreeSlide();
         operator.initByName("tree", tree, "parameterization", model, "weight", 1.0, "size", 3);
+
+        // trigger proposal
+        logHR = operator.proposal();
+    }
+
+    @Test
+    public void testScale() {
+
+        // initialize operator
+        AnnotatedScale operator = new AnnotatedScale();
+        operator.initByName("tree", tree, "parameterization", model, "parameterInverse", lifetime, "weight", 1.0, "scaleFactor", 0.5, "drawEvents", true);
 
         // trigger proposal
         logHR = operator.proposal();

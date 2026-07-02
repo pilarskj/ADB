@@ -143,17 +143,10 @@ public class LifetimeDistributions {
 
     protected void findDirty() {
         for (int i = 0; i < nTypes; i++) {
-            if (lifetimeParameter.isDirty(i)) { // Note: for some reason shapeParameter.isDirty(i) does not work!
-                dirtyIndices.set(i); // mark this index as needing a store/restore
-            }
-            if (shapeParameter instanceof RealParameter) {
-                if (((RealParameter)shapeParameter).isDirty(i)) {
-                    dirtyIndices.set(i);
-                }
-            } else if (shapeParameter instanceof IntegerParameter) {
-                if (((IntegerParameter)shapeParameter).isDirty(i)) {
-                    dirtyIndices.set(i);
-                }
+            // mark this index for recalculation
+            if (lifetimeParameter.getArrayValue(i) != lifetimeDistributions[i].lifetime ||
+                    shapeParameter.getArrayValue(i) != lifetimeDistributions[i].shape) {
+                dirtyIndices.set(i);
             }
         }
         dirty = true;
