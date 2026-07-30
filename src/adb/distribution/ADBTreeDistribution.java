@@ -187,6 +187,11 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             }
         }
 
+        // clear cache
+        if (approx) {
+            gammaCache.clear();
+        }
+
         // TODO: add single-type BD analytical solution
 
         // stop if extinction is certain
@@ -254,6 +259,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             }
 
         } else {
+            // TODO: account for type transition at root
             conditionFactor = -2 * Math.log(1 - P0[getType(root)][nSteps - 1]);
 
             Node leftSubtree = root.getLeft();
@@ -342,11 +348,11 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
             AnnotatedNode rightSubtree = (AnnotatedNode) node.getRight();
 
             double factor;
-            if (leftType == nodeType && rightType == nodeType) { // symmetric division
+            if (leftType == rightType) { // symmetric division
                 factor = parameterization.getSymTransition(nodeType, leftType);
-            } else if (leftType == nodeType && rightType != nodeType) { // asymmetric division
+            } else if (leftType == nodeType) { // asymmetric division
                 factor = 0.5 * parameterization.getAsymTransition(nodeType, rightType);
-            } else if (leftType != nodeType && rightType == nodeType) {
+            } else if (rightType == nodeType) {
                 factor = 0.5 * parameterization.getAsymTransition(nodeType, leftType);
             } else { // impossible transition
                 return Double.NEGATIVE_INFINITY;
@@ -383,13 +389,13 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
             double nextLik = calculateSegmentDensity(j, s, e);
             if (i == j) {
-                double sum = parameterization.getSymTransition(i, i) * P0Map.get(i).value(e);
+                double sum = 2 * parameterization.getSymTransition(i, i) * P0Map.get(i).value(e);
                 for (int k = 0; k < nTypes; k++) {
                     sum += parameterization.getAsymTransition(i, k) * P0Map.get(k).value(e);
                 }
                 likelihood *= sum * nextLik;
             } else {
-                likelihood *= (parameterization.getSymTransition(i, j) * P0Map.get(j).value(e) +
+                likelihood *= (2 * parameterization.getSymTransition(i, j) * P0Map.get(j).value(e) +
                         parameterization.getAsymTransition(i, j) * P0Map.get(i).value(e)) *
                         nextLik;
             }

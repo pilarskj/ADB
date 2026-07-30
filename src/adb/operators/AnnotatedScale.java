@@ -17,6 +17,7 @@ import java.util.List;
 
 // adapted from https://github.com/tgvaughan/MultiTypeTree/blob/master/src/multitypetree/operators/MultiTypeTreeScale.java
 // assumes ultrametric trees (leaf height = 0.0!)
+// TODO: change to Bactrian version?
 @Description("Scale operator for annotated trees. Also allows additional "
         + "scalar parameters to be rescaled (either forward or inversely) "
         + "at the same time.")
@@ -45,7 +46,7 @@ public class AnnotatedScale extends AnnotatedTreeOperator {
     public Input<Double> scaleFactorInput = new Input<>("scaleFactor",
             "scaling is restricted to the range [1/scaleFactor, scaleFactor]", 0.75);
 
-    final public Input<Boolean> optimiseInput = new Input<>("optimise",
+    public Input<Boolean> optimiseInput = new Input<>("optimise",
             "flag to indicate that the scale factor is automatically changed in order to achieve a good acceptance rate (default true)", true);
 
     public Input<Boolean> drawEventsInput = new Input<>("drawEvents",

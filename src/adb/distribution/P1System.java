@@ -136,7 +136,7 @@ public class P1System {
 
     protected void store() {
         for (int i = 0; i < nTypes; i++) {
-            for (int j = 0; j < nTypes; i++) {
+            for (int j = 0; j < nTypes; j++) {
                 System.arraycopy(P1[i][j], 0, storedP1[i][j], 0, nSteps);
             }
         }

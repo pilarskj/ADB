@@ -6,6 +6,7 @@ import beast.base.core.Description;
 import beast.base.core.Log;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
+import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.StateNode;
 import beast.base.inference.StateNodeInitialiser;
 
@@ -299,10 +300,10 @@ public class AnnotatedTree extends Tree {
     }
 
 
-    // TODO: override Tree functions -- How will those change in BEAST 2.8? Are all these modifications necessary?
     /**
      * ************************ *
      * Methods ported from Tree *
+     * (adapted from MultiTypeTree)
      * ************************ *
      */
 
@@ -419,6 +420,9 @@ public class AnnotatedTree extends Tree {
         }
     }
 
+    /**
+     * Store current StateNode *
+     */
     @Override
     protected void store() {
         int rootNr = root.getNr();
@@ -463,26 +467,121 @@ public class AnnotatedTree extends Tree {
         }
     }
 
+    /**
+     * Loggable interface *
+     */
+    @Override
+    public void init(PrintStream printStream) {
+        printStream.println("#NEXUS\n");
+        printStream.println("Begin taxa;");
+        printStream.println("\tDimensions ntax=" + getLeafNodeCount() + ";");
+        printStream.println("\t\tTaxlabels");
+        for (int i = 0; i < getLeafNodeCount(); i++)
+            printStream.println("\t\t\t" + getNodesAsArray()[i].getID());
+        printStream.println("\t\t\t;");
+        printStream.println("End;");
+
+        printStream.println("Begin trees;");
+        printStream.println("\tTranslate");
+        for (int i = 0; i < getLeafNodeCount(); i++) {
+            printStream.print("\t\t\t" + (getNodesAsArray()[i].getNr() + 1)
+                    + " " + getNodesAsArray()[i].getID());
+            if (i < getLeafNodeCount()-1)
+                printStream.print(",");
+            printStream.print("\n");
+        }
+        printStream.print("\t\t\t;");
+    }
+
+    @Override
+    public void log(long i, PrintStream printStream) {
+        printStream.print("tree STATE_" + i + " = ");
+        printStream.print(toString());
+        printStream.print(";");
+    }
+
+    @Override
+    public void close(PrintStream printStream) {
+        printStream.println("End;");
+    }
 
     /**
      * String representation for logging *
      */
     @Override
-    public void log(long sample, PrintStream out) {
-        Tree tree = (Tree) getCurrent();
-        out.print("tree STATE_" + sample + " = ");
-        Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false); // TODO: depends on the number of types!
-        // String newick = flatTree.getRoot().toSortedNewick(new int[1], true); // TODO: use toSortedNewick
-        String newick = flatTree.getRoot().toNewick();
-        // String newick = tree.getRoot().toSortedNewick(new int[1], true);
-        out.print(newick);
-        out.print(";");
+    public String toString() {
+        // behaves differently if writing a state file
+        StackTraceElement[] ste = Thread.currentThread().getStackTrace();
+        if (ste[2].getMethodName().equals("toXML")) {
+            // use toShortNewick to generate Newick string without taxon labels
+            return convertAnnotatedTree(false).getRoot().toShortNewick(true);
+        } else{
+            // TODO: add different options for logging (with/without type, with/without hidden events)
+            return convertAnnotatedTree(false).getRoot().toSortedNewick(new int[1], true);
+        }
     }
 
-    // TODO: String representation of annotated tree
+    // TODO: currently different from MultiTypeTree version
+    /**
+     * Reconstruct tree from XML fragment in the form of a DOM node *
+     */
+    @Override
+    public void fromXML(final org.w3c.dom.Node node) {
+        Tree tree = new TreeParser();
+        tree.initByName(
+                "newick", node.getTextContent(),
+                "adjustTipHeights", false,
+                "IsLabelledNewick", false);
 
-    // TODO: Methods implementing the Loggable interface: init, log, close PrintStream
+        boolean containsEvents = false;
+        for (int i = 0; i < tree.getNodeCount(); i++) {
+            if (tree.getNode(i).getChildCount() == 1) {
+                containsEvents = true;
+                break;
+            }
+        }
 
-    // TODO: Function for reconstructing tree from XML fragment in the form of a DOM node
+        if (containsEvents) {
+            convertEventTree(tree);
+        } else {
+            convertBranchingTree(tree);
+        }
+    }
+
+
+
+    /**
+     * DEBUG CHECKS
+     */
+    Integer[] _hashValues = new Integer[2];
+
+    @Override
+    public int getChecksum() {
+        // If the AnnotatedTree is the same, the following properties need to match:
+
+        // 1. total number of hidden events
+        int n = 0;
+        for (Node node : getNodesAsArray()) {
+            n += ((AnnotatedNode)node).getEventCount();
+        }
+        _hashValues[0] = n;
+
+        // 2. mean of waiting times
+        double sumN = 0;
+        for (int i = 0; i < getNodeCount(); i++) {
+            double[] times = ((AnnotatedNode)getNode(i)).getWaitingTimes();
+            int sumT = 0;
+            for (int j = 0; j < times.length; j++) {
+                sumT += times[j];
+            }
+            sumT /= times.length;
+            sumN += sumT;
+        }
+        double mean = sumN / getNodeCount();
+
+        _hashValues[1] = Double.hashCode(mean);
+
+        return Arrays.deepHashCode(_hashValues);
+    }
 
 }
