@@ -248,11 +248,11 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         double logL;
 
         if (conditionOnOrigin) {
-            conditionFactor = -Math.log(1 - P0[originType][nSteps - 1]);
+            conditionFactor = -Math.log1p(-P0[originType][nSteps - 1]);
 
             if (tree instanceof AnnotatedTree) {
                 double[] subtreeLikelihood = new double[tree.getNodeCount()];
-                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) root, rootHeight, originTime, subtreeLikelihood));
+                logL = calculateAnnotatedSubtreeLikelihood((AnnotatedNode) root, rootHeight, originTime, subtreeLikelihood);
             } else {
                 double[][] subtreeLikelihood = new double[tree.getNodeCount()][nTypes];
                 logL = Math.log(calculateSubtreeLikelihood(root, rootHeight, originTime, subtreeLikelihood)[originType]);
@@ -260,14 +260,14 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
         } else {
             // TODO: account for type transition at root
-            conditionFactor = -2 * Math.log(1 - P0[getType(root)][nSteps - 1]);
+            conditionFactor = -2 * Math.log1p(-P0[getType(root)][nSteps - 1]);
 
             Node leftSubtree = root.getLeft();
             Node rightSubtree = root.getRight();
             if (tree instanceof AnnotatedTree) {
                 double[] subtreeLikelihood = new double[tree.getNodeCount()];
-                logL = Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) leftSubtree, leftSubtree.getHeight(), rootHeight, subtreeLikelihood)) +
-                        Math.log(calculateAnnotatedSubtreeLikelihood((AnnotatedNode) rightSubtree, rightSubtree.getHeight(), rootHeight, subtreeLikelihood));
+                logL = calculateAnnotatedSubtreeLikelihood((AnnotatedNode) leftSubtree, leftSubtree.getHeight(), rootHeight, subtreeLikelihood) +
+                        calculateAnnotatedSubtreeLikelihood((AnnotatedNode) rightSubtree, rightSubtree.getHeight(), rootHeight, subtreeLikelihood);
             } else {
                 double[][] subtreeLikelihood = new double[tree.getNodeCount()][nTypes];
                 logL = Math.log(calculateSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), rootHeight, subtreeLikelihood)[getType(root)]) +
@@ -279,48 +279,6 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         //Tree flatTree = ((AnnotatedTree)tree).convertAnnotatedTree(false);
         //System.out.println(flatTree.getRoot().toNewick());
         return logL;
-    }
-
-
-    // track time backwards (start < end)
-    private double[] calculateSubtreeLikelihood(Node node, double start, double end, double[][] subtreeLikelihood) {
-
-        double[] likelihood = new double[nTypes];
-        int type = getType(node);
-
-        // upstream branch
-        double[][] branchDensity = calculateNodeLikelihood(node, start, end);
-
-        // at tips
-        if (node.isLeaf()) {
-            for (int i = 0; i < nTypes; i++) {
-                likelihood[i] = branchDensity[i][type];
-            }
-
-        // recursion bottom-up
-        } else {
-            Node leftChild = node.getLeft();
-            Node rightChild = node.getRight();
-            double[] leftSubtreeLik = calculateSubtreeLikelihood(leftChild, leftChild.getHeight(), start, subtreeLikelihood);
-            double[] rightSubtreeLik = calculateSubtreeLikelihood(rightChild, rightChild.getHeight(), start, subtreeLikelihood);
-
-            for (int i = 0; i < nTypes; i++) {
-                double lik = 0;
-                for (int j = 0; j < nTypes; j++) {
-                    double sum = 0;
-                    for (int k = 0; k < nTypes; k++) {
-                        sum += parameterization.getSymTransition(j, k) * leftSubtreeLik[k] * rightSubtreeLik[k] +
-                                0.5 * parameterization.getAsymTransition(j, k) *
-                                        (leftSubtreeLik[j] * rightSubtreeLik[k] + leftSubtreeLik[k] * rightSubtreeLik[j]);
-                    }
-                    lik += branchDensity[i][j] * sum;
-                }
-                likelihood[i] = lik;
-            }
-        }
-
-        System.arraycopy(likelihood, 0, subtreeLikelihood[node.getNr()], 0, nTypes);
-        return likelihood;
     }
 
 
@@ -358,8 +316,8 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
                 return Double.NEGATIVE_INFINITY;
             }
 
-            likelihood = branchDensity * factor *
-                    calculateAnnotatedSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), node.getHeight(), subtreeLikelihood) *
+            likelihood = branchDensity + Math.log(factor) +
+                    calculateAnnotatedSubtreeLikelihood(leftSubtree, leftSubtree.getHeight(), node.getHeight(), subtreeLikelihood) +
                     calculateAnnotatedSubtreeLikelihood(rightSubtree, rightSubtree.getHeight(), node.getHeight(), subtreeLikelihood);
         }
 
@@ -393,10 +351,10 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
                 for (int k = 0; k < nTypes; k++) {
                     sum += parameterization.getAsymTransition(i, k) * P0Map.get(k).value(e);
                 }
-                likelihood *= sum * nextLik;
+                likelihood += Math.log(sum) + nextLik;
             } else {
-                likelihood *= (2 * parameterization.getSymTransition(i, j) * P0Map.get(j).value(e) +
-                        parameterization.getAsymTransition(i, j) * P0Map.get(i).value(e)) *
+                likelihood += Math.log(2 * parameterization.getSymTransition(i, j) * P0Map.get(j).value(e) +
+                        parameterization.getAsymTransition(i, j) * P0Map.get(i).value(e)) +
                         nextLik;
             }
 
@@ -410,11 +368,53 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     private double calculateSegmentDensity(int type, double start, double end) {
         double density;
         if (start == 0.0) {
-            density = parameterization.getSampling(type) * (1 - gammaDistributions.get(type).cumulativeProbability(end));
+            density = Math.log(parameterization.getSampling(type)) + Math.log1p(-gammaDistributions.get(type).cumulativeProbability(end));
         } else {
-            density = (1 - parameterization.getDeath(type)) * Math.exp(gammaDistributions.get(type).logDensity(end - start));
+            density = Math.log1p(-parameterization.getDeath(type)) + gammaDistributions.get(type).logDensity(end - start);
         }
         return density;
+    }
+
+
+    // track time backwards (start < end)
+    private double[] calculateSubtreeLikelihood(Node node, double start, double end, double[][] subtreeLikelihood) {
+
+        double[] likelihood = new double[nTypes];
+        int type = getType(node);
+
+        // upstream branch
+        double[][] branchDensity = calculateNodeLikelihood(node, start, end);
+
+        // at tips
+        if (node.isLeaf()) {
+            for (int i = 0; i < nTypes; i++) {
+                likelihood[i] = branchDensity[i][type];
+            }
+
+            // recursion bottom-up
+        } else {
+            Node leftChild = node.getLeft();
+            Node rightChild = node.getRight();
+            double[] leftSubtreeLik = calculateSubtreeLikelihood(leftChild, leftChild.getHeight(), start, subtreeLikelihood);
+            double[] rightSubtreeLik = calculateSubtreeLikelihood(rightChild, rightChild.getHeight(), start, subtreeLikelihood);
+
+            for (int i = 0; i < nTypes; i++) {
+                double lik = 0;
+                for (int j = 0; j < nTypes; j++) {
+                    double sum = 0;
+                    for (int k = 0; k < nTypes; k++) {
+                        sum += parameterization.getSymTransition(j, k) * leftSubtreeLik[k] * rightSubtreeLik[k] +
+                                0.5 * parameterization.getAsymTransition(j, k) *
+                                        (leftSubtreeLik[j] * rightSubtreeLik[k] + leftSubtreeLik[k] * rightSubtreeLik[j]);
+                    }
+                    lik += branchDensity[i][j] * sum;
+                }
+                likelihood[i] = lik;
+            }
+        }
+
+        System.arraycopy(likelihood, 0, subtreeLikelihood[node.getNr()], 0, nTypes);
+        return likelihood;
     }
 
 
