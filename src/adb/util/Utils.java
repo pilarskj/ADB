@@ -12,13 +12,16 @@ import org.apache.commons.math3.transform.TransformType;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
 
     // Global tools for calculations
+    // thread-safe FFT
+    public static ThreadLocal<FastFourierTransformer> FFT =
+            ThreadLocal.withInitial(() -> new FastFourierTransformer(DftNormalization.STANDARD));
+    // standard FFT
     public static FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
     public static LinearInterpolator interpolator = new LinearInterpolator();
 
@@ -55,6 +58,8 @@ public class Utils {
 
     // Perform partial convolution using FFT
     public static double[] convolveFFT(Complex[] fx, double[] y, int n, double eps) {
+
+        FastFourierTransformer fft = FFT.get();
 
         // perform FFT on padded y
         Complex[] fy = fft.transform(padZeros(y), TRANSFORM_FORWARD);

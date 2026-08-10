@@ -3,8 +3,6 @@ package adb.distribution;
 import adb.distribution.LifetimeDistributions.LifetimeDistribution;
 import adb.util.Utils;
 
-import java.util.stream.IntStream;
-
 
 public class P1System {
 
@@ -65,14 +63,12 @@ public class P1System {
         // notation: it = iteration, w = integration variable (time), i,j,k = types
         // initialize matrix
         double[][][] X0 = new double[nTypes][nTypes][nSteps];
-        IntStream.range(0, nTypes)
-                .parallel()
-                .forEach(i -> {
-                    double[] cdf =  distributions[i].getCDF();
-                    for (int w = 0; w < nSteps; w++) {
-                        X0[i][i][w] = rho[i] * (1 - cdf[w]);
-                    }
-                });
+        for (int i = 0; i < nTypes; i++) {
+            double[] cdf =  distributions[i].getCDF();
+            for (int w = 0; w < nSteps; w++) {
+                X0[i][i][w] = rho[i] * (1 - cdf[w]);
+            }
+        }
 
         // set up iteration
         double err = 1;
@@ -81,7 +77,7 @@ public class P1System {
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][][] Xi = new double[nTypes][nTypes][nSteps];
+            double[][][] Xn = new double[nTypes][nTypes][nSteps]; // next iteration
 
             for (int i = 0; i < nTypes; i++) {
                 for (int j = 0; j < nTypes; j++) {
@@ -99,16 +95,16 @@ public class P1System {
 
                     // sum
                     for (int w = 0; w < nSteps; w++) {
-                        Xi[i][j][w] = X0[i][j][w] + 2 * (1 - d[i]) * I[w];
+                        Xn[i][j][w] = X0[i][j][w] + 2 * (1 - d[i]) * I[w];
                     }
                 }
             }
 
             // compute error
-            err = Utils.getError(X, Xi);
+            err = Utils.getError(X, Xn);
 
             // update
-            X = Xi;
+            X = Xn;
             it++;
         }
 

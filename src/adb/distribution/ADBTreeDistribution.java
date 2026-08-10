@@ -10,7 +10,6 @@ import beast.base.core.Input;
 import beast.base.core.Log;
 import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
-import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
 
@@ -23,7 +22,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.IntStream;
 
 import static adb.util.Utils.TRANSFORM_FORWARD;
 import static adb.tree.AnnotatedNode.getType;
@@ -462,22 +460,20 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
         Complex[][] pdfFFT = new Complex[nTypes][nSteps * 2];
         double[][] P0 = new double[nTypes][nSteps];
         double[][][] X0 = new double[nTypes][nTypes][nSteps];
-        IntStream.range(0, nTypes)
-                .parallel()
-                .forEach(i -> {
-                    GammaDistribution gammaDist = gammaDistributions.get(i);
-                    double[] pdf = new double[nSteps];
-                    for (int w = 0; w < nSteps; w++) {
-                        pdf[w] = Math.exp(gammaDist.logDensity(ageSeq[w])); // get density
-                        P0[i][w] = P0Map.get(i).value(seq[w]); // extrapolate P0
-                        X0[i][i][w] = (1 - parameterization.getDeath(i)) * pdf[w]; // initialize matrix
-                    }
+        for (int i = 0; i < nTypes; i++) {
+            GammaDistribution gammaDist = gammaDistributions.get(i);
+            double[] pdf = new double[nSteps];
+            for (int w = 0; w < nSteps; w++) {
+                pdf[w] = Math.exp(gammaDist.logDensity(ageSeq[w])); // get density
+                P0[i][w] = P0Map.get(i).value(seq[w]); // extrapolate P0
+                X0[i][i][w] = (1 - parameterization.getDeath(i)) * pdf[w]; // initialize matrix
+            }
 
-                    Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
-                    for (int w = 0; w < nSteps * 2; w++) {
-                        pdfFFT[i][w] = Ft[w];
-                    }
-                });
+            Complex[] Ft = Utils.fft.transform(Utils.padZeros(pdf), TRANSFORM_FORWARD);
+            for (int w = 0; w < nSteps * 2; w++) {
+                pdfFFT[i][w] = Ft[w];
+            }
+        }
 
         // set up iteration
         double err = 1;
@@ -486,7 +482,7 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][][] Xi = new double[nTypes][nTypes][nSteps];
+            double[][][] Xn = new double[nTypes][nTypes][nSteps];
 
             for (int i = 0; i < nTypes; i++) {
                 for (int j = 0; j < nTypes; j++) {
@@ -507,16 +503,16 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
 
                     // sum
                     for (int w = 0; w < nSteps; w++) {
-                        Xi[i][j][w] = X0[i][j][w] + 2 * (1 - parameterization.getDeath(i)) * I[w];
+                        Xn[i][j][w] = X0[i][j][w] + 2 * (1 - parameterization.getDeath(i)) * I[w];
                     }
                 }
             }
 
             // compute error
-            err = Utils.getError(X, Xi);
+            err = Utils.getError(X, Xn);
 
             // update
-            X = Xi;
+            X = Xn;
             it++;
         }
 

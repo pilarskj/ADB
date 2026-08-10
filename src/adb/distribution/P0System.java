@@ -60,14 +60,12 @@ public class P0System {
         // notation: it = iteration, w = integration variable (time), i,j,k = types
         // initialize matrix
         double[][] X0 = new double[nTypes][nSteps];
-        IntStream.range(0, nTypes)
-                .parallel()
-                .forEach(i -> {
-                    double[] cdf = distributions[i].getCDF();
-                    for (int w = 0; w < nSteps; w++) {
-                        X0[i][w] = (1 - rho[i]) * (1 - cdf[w]) + d[i] * cdf[w];
-                    }
-                });
+        for (int i = 0; i < nTypes; i++) {
+            double[] cdf = distributions[i].getCDF();
+            for (int w = 0; w < nSteps; w++) {
+                X0[i][w] = (1 - rho[i]) * (1 - cdf[w]) + d[i] * cdf[w];
+            }
+        }
 
         // set up iteration
         double err = 1;
@@ -76,30 +74,48 @@ public class P0System {
 
         // iterate
         while (err > tol && it < maxIt) {
-            double[][] Xi = new double[nTypes][nSteps];
+            double[][] Xn = new double[nTypes][nSteps]; // next iteration
 
-            for (int i = 0; i < nTypes; i++) {
+            if (nTypes == 1) {
+                int i = 0; // single type
                 // get vectors for convolution
                 double[] y = new double[nSteps];
                 for (int w = 0; w < nSteps; w++) { // multiply elementwise on times
-                    for (int j = 0; j < nTypes; j++) { // sum over all types k
-                        y[w] += parameterization.getSymTransition(i,j) * X[j][w] * X[j][w] +
-                                parameterization.getAsymTransition(i,j) * X[i][w] * X[j][w];
-                    }
+                    y[w] = X[i][w] * X[i][w];
                 }
                 // partially convolve
                 double[] I = Utils.convolveFFT(distributions[i].getTransformedPDF(), y, nSteps, timeStep);
                 // sum
                 for (int w = 0; w < nSteps; w++) {
-                    Xi[i][w] = X0[i][w] + (1 - d[i]) * I[w];
+                    Xn[i][w] = X0[i][w] + (1 - d[i]) * I[w];
                 }
             }
 
+            else {
+                final double[][] Xc = X; // current X, read-only
+                IntStream.range(0, nTypes).parallel().forEach(i -> { // parallelize expensive computation
+                    // get vectors for convolution
+                    double[] y = new double[nSteps];
+                    for (int w = 0; w < nSteps; w++) { // multiply elementwise on times
+                        for (int j = 0; j < nTypes; j++) { // sum over all types k
+                            y[w] += parameterization.getSymTransition(i,j) * Xc[j][w] * Xc[j][w] +
+                                    parameterization.getAsymTransition(i,j) * Xc[i][w] * Xc[j][w];
+                        }
+                    }
+                    // partially convolve
+                    double[] I = Utils.convolveFFT(distributions[i].getTransformedPDF(), y, nSteps, timeStep);
+                    // sum
+                    for (int w = 0; w < nSteps; w++) {
+                        Xn[i][w] = X0[i][w] + (1 - d[i]) * I[w];
+                    }
+                });
+            }
+
             // compute error
-            err = Utils.getError(X, Xi);
+            err = Utils.getError(X, Xn);
 
             // update
-            X = Xi;
+            X = Xn;
             it++;
         }
 
