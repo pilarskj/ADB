@@ -15,7 +15,6 @@ import java.util.Map;
 
 
 /* Adapted from beast.base.inference.operator.DeltaExchangeOperator */
-// TODO: compatible with any [0,1] priors on transition probabilities?
 @Description("Operator for row-wise sum-constrained parameters.")
 public class MatrixDeltaExchangeOperator extends Operator {
 
@@ -25,8 +24,8 @@ public class MatrixDeltaExchangeOperator extends Operator {
     public Input<Double> deltaInput =
             new Input<>("delta", "Magnitude of change for two randomly picked values.", 0.1);
 
-    public Input<Boolean> excludeZerosInput =
-            new Input<>("excludeZeros", "Exclude zeros from operation (default true)", true);
+    public Input<Boolean> excludeZeroOneInput =
+            new Input<>("excludeZeroOne", "Exclude zeros and ones from operation (default true)", true);
 
     public final Input<Boolean> autoOptimizeInput =
             new Input<>("autoOptimize", "Adjust delta during the MCMC run to improve mixing (default true).", true);
@@ -34,7 +33,7 @@ public class MatrixDeltaExchangeOperator extends Operator {
 
     private List<RealParameter> parameters;
     private double delta;
-    private boolean excludeZeros;
+    private boolean excludeZeroOne;
     private boolean autoOptimize;
 
     private int nparams;
@@ -46,12 +45,21 @@ public class MatrixDeltaExchangeOperator extends Operator {
     public void initAndValidate() {
         parameters = parameterInput.get();
         delta = deltaInput.get();
-        excludeZeros = excludeZerosInput.get();
+        excludeZeroOne = excludeZeroOneInput.get();
         autoOptimize = autoOptimizeInput.get();
 
         nparams = parameters.size();
+        if (nparams == 0) {
+            throw new IllegalArgumentException("Please provide at least one parameter for this operator.");
+        }
+
         int dim = parameters.get(0).getDimension();
         ndims = (int)(Math.sqrt(dim));
+
+        // assert that matrices are quadratic
+        if (dim != ndims * ndims) {
+            throw new IllegalArgumentException("Provided parameters cannot be converted into quadratic matrices.");
+        }
 
         // if more parameters are provided, assert that they have the same dimension
         if (nparams > 1) {
@@ -62,11 +70,11 @@ public class MatrixDeltaExchangeOperator extends Operator {
             }
         }
 
-        // collect non-zero elements
-        if (excludeZeros) { // TODO: Am I overcomplicating?
+        // collect non-zero and non-one elements
+        if (excludeZeroOne) {
             matrices = new ArrayList<>(nparams);
             indices = new ArrayList<>(nparams);
-            List<int[]> nonZeroCounts = new ArrayList<>(nparams);
+            List<int[]> nonZeroOneCounts = new ArrayList<>(nparams);
 
             for (RealParameter param : parameters) {
                 // populate matrices
@@ -78,14 +86,14 @@ public class MatrixDeltaExchangeOperator extends Operator {
                 }
                 matrices.add(matrix);
 
-                // collect 0 indices row-wise
+                // collect 0 and 1 indices row-wise
                 int[] counts = new int[ndims];
                 Map<Integer, int[]> idx = new HashMap<>();
                 for (int i = 0; i < ndims; i++) {
 
                     // first, count non-zero elements
                     int count = 0;
-                    for (double v : matrix[i]) if (v != 0.0) count++;
+                    for (double v : matrix[i]) if (v != 0.0 && v != 1.0) count++;
                     counts[i] = count;
 
                     // store indices
@@ -93,13 +101,13 @@ public class MatrixDeltaExchangeOperator extends Operator {
                         int[] ix = new int[count];
                         int k = 0;
                         for (int j = 0; j < ndims; j++) {
-                            if (matrix[i][j] != 0.0) ix[k++] = j;
+                            if (matrix[i][j] != 0.0 && matrix[i][j] != 1.0) ix[k++] = j;
                         }
                         idx.put(i, ix);
                     }
                 }
                 indices.add(idx);
-                nonZeroCounts.add(counts);
+                nonZeroOneCounts.add(counts);
             }
 
             // check valid rows
@@ -107,7 +115,7 @@ public class MatrixDeltaExchangeOperator extends Operator {
             for (int i = 0; i < ndims; i++) {
                 int rowCount = 0;
                 for (int p = 0; p < nparams; p++) {
-                    rowCount += nonZeroCounts.get(p)[i];
+                    rowCount += nonZeroOneCounts.get(p)[i];
                 }
                 if (rowCount > 1) { valid = true; break; } // at least one row can be modified with this operator
             }
@@ -129,14 +137,14 @@ public class MatrixDeltaExchangeOperator extends Operator {
         // columns
         int j1;
         int j2;
-        if (!excludeZeros) {
+        if (!excludeZeroOne) {
             j1 = Randomizer.nextInt(ndims);
             j2 = Randomizer.nextInt(ndims);
         } else {
             int k = i;
             while (indices.get(m1).get(i) == null || indices.get(m2).get(i) == null) { //
                 if (i < ndims-1) {i++;} else {i=0;}
-                if (i == k) { return Double.NEGATIVE_INFINITY; } // no move possible; or 0.0? // TODO: assure correctness for all cases!
+                if (i == k) { return Double.NEGATIVE_INFINITY; } // no move possible; TODO: -Inf or 0.0? (affects optimization!)
             }
             j1 = randomSample(indices.get(m1).get(i));
             j2 = randomSample(indices.get(m2).get(i));
@@ -144,8 +152,8 @@ public class MatrixDeltaExchangeOperator extends Operator {
 
         int dim1 = i * ndims + j1; // entry 1
         int dim2 = i * ndims + j2; // entry 2
-        if (m1 == m2 && dim1 == dim2) { // no move
-            return 0.0;
+        if (m1 == m2 && dim1 == dim2) { // no move (self)
+            return Double.NEGATIVE_INFINITY; // TODO: -Inf or 0.0? (affects optimization!)
         }
 
         // extract values
@@ -169,6 +177,7 @@ public class MatrixDeltaExchangeOperator extends Operator {
     }
 
 
+    // TODO: change to private or do in proposal
     public static int randomSample(int[] values) {
         int idx = Randomizer.nextInt(values.length);
         return values[idx];
