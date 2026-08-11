@@ -92,7 +92,7 @@ public class Utils {
         return sum / array.length;
     }
 
-
+    @Deprecated
     // Enforce non-increasing or non-decreasing array -- change String order?
     public static void forceOrder(double[] array, String order) {
         if (order.equals("non-increasing")) {
@@ -109,6 +109,25 @@ public class Utils {
             }
         } else {
             throw new IllegalArgumentException("Invalid order: use non-increasing or non-decreasing");
+        }
+    }
+
+    // Enforce monotonicity of array
+    public static void enforceMonotonicity(double[] array, int order) {
+        if (order == -1) {
+            for (int i = 1; i < array.length; i++) {
+                if (array[i] > array[i - 1]) {
+                    array[i] = array[i - 1]; // adjust to maintain non-increasing order
+                }
+            }
+        } else if (order == 1) {
+            for (int i = 1; i < array.length; i++) {
+                if (array[i] < array[i - 1]) {
+                    array[i] = array[i - 1]; // adjust to maintain non-decreasing order
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("Invalid order: use -1 for non-increasing or 1 for non-decreasing");
         }
     }
 

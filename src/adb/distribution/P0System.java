@@ -89,6 +89,13 @@ public class P0System {
                 for (int w = 0; w < nSteps; w++) {
                     Xn[i][w] = X0[i][w] + (1 - d[i]) * I[w];
                 }
+
+                // add regularization (enforce monotonicity, cf. Theorem 2 in Jones, 2011)
+                if (d[i] < 0.5 && (1-rho[i]) > d[i]/(1-d[i])) {
+                    Utils.enforceMonotonicity(Xn[i], -1);
+                } else {
+                    Utils.enforceMonotonicity(Xn[i], 1);
+                }
             }
 
             else {
@@ -109,6 +116,18 @@ public class P0System {
                         Xn[i][w] = X0[i][w] + (1 - d[i]) * I[w];
                     }
                 });
+            }
+
+            // add regularization: bounds
+            for (int i = 0; i < nTypes; i++) {
+                for (int w = 0; w < nSteps; w++) {
+                    if (Xn[i][w] < 0) {
+                        Xn[i][w] = 0;
+                    }
+                    if (Xn[i][w] > 1) {
+                        Xn[i][w] = 1;
+                    }
+                }
             }
 
             // compute error
