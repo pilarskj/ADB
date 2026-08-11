@@ -114,20 +114,15 @@ public class P0System {
                     // sum
                     for (int w = 0; w < nSteps; w++) {
                         Xn[i][w] = X0[i][w] + (1 - d[i]) * I[w];
+                        // keep bounds
+                        if (Xn[i][w] < 0) {
+                            Xn[i][w] = 0;
+                        }
+                        if (Xn[i][w] > 1) {
+                            Xn[i][w] = 1;
+                        }
                     }
                 });
-            }
-
-            // add regularization: bounds
-            for (int i = 0; i < nTypes; i++) {
-                for (int w = 0; w < nSteps; w++) {
-                    if (Xn[i][w] < 0) {
-                        Xn[i][w] = 0;
-                    }
-                    if (Xn[i][w] > 1) {
-                        Xn[i][w] = 1;
-                    }
-                }
             }
 
             // compute error
