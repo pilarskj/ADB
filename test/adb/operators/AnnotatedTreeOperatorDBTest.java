@@ -65,7 +65,8 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
                 double treeLength = TreeUtils.getTreeLength(tree, tree.getRoot());
                 return String.format("%.0f", 2 * treeLength);
             }),
-            new StateMapper<Tree>("TreeImbalance", tree -> String.valueOf(rootImbalance(tree.getRoot())))
+            new StateMapper<Tree>("TreeImbalance", tree -> String.valueOf(rootImbalance(tree.getRoot()))),
+            new StateMapper<Tree>("TreeEventCount", tree -> String.valueOf(totalEventCount(tree)))
         );
     }
 
@@ -79,7 +80,7 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
 
             @Override
             protected TreeOperator getOperator(Tree tree) {
-                return getAnnotatedScale(tree);  // change here operator for testing
+                return getAnnotatedWilsonBalding(tree);  // change here operator for testing
             }
         });
     }
@@ -260,5 +261,14 @@ public class AnnotatedTreeOperatorDBTest extends DetailedBalanceTest<Tree> {
                 //"originTime", 10.0
         );
         return parameterization;
+    }
+
+    // additional function: total number of events on tree
+    static public int totalEventCount(Tree tree) {
+        int n = 0;
+        for (Node node : tree.getNodesAsArray()) {
+            n += ((AnnotatedNode)node).getEventCount();
+        }
+        return n;
     }
 }
