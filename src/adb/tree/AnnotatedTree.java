@@ -232,71 +232,84 @@ public class AnnotatedTree extends Tree {
 
 
     // function to convert AnnotatedTree to Tree with single-child nodes compatible with newick format
-    public Tree convertAnnotatedTree(boolean recordType) {
+    // adapted from https://github.com/tgvaughan/MultiTypeTree/blob/master/src/multitypetree/evolution/tree/MultiTypeTree.java#L444
+    public Tree convertAnnotatedTree() {
 
         // create new tree to modify
         Tree tree = copy();
         tree.initArrays();
 
-        List<Node> nodes = new ArrayList<>();
-        int nextNr = getNodeCount();
+        int nextNodeNr = getNodeCount();
+        Node eventNode;
+        Node newRoot = tree.getRoot(); // might be updated
+
         for (Node node : getNodesAsArray()) {
+
             AnnotatedNode aNode = (AnnotatedNode)node;
             int nodeNr = node.getNr();
 
             Node startNode = tree.getNode(nodeNr);
-            startNode.setID(aNode.getID());
-            if (recordType) {
-                startNode.setMetaData("type", aNode.getType());
-                startNode.metaDataString = String.format("%s=%d", "type", aNode.getType());
-            }
-            nodes.add(startNode);
+            startNode.setMetaData("type", aNode.getType());
+            startNode.metaDataString = String.format("%s=%d", "type", aNode.getType());
 
             Node endNode = startNode.getParent();
+
             Node branchNode = startNode;
-            Node eventNode;
             for (int i = 1; i < aNode.getEventCount(); i++) {
 
                 // create and label new node
-                eventNode = new Node();
-                eventNode.setNr(nextNr);
-                nextNr++;
+                eventNode = new AnnotatedNode();
+                eventNode.setNr(nextNodeNr);
+                nextNodeNr++;
 
                 // connect to child and parent
                 branchNode.setParent(eventNode);
                 eventNode.addChild(branchNode);
 
-                // set height and type
+                // ensure height and type are set
                 eventNode.setHeight(aNode.getEvent(i).getHeight());
-                if (recordType) {
-                    eventNode.setMetaData("type", aNode.getEvent(i).getType());
-                    eventNode.metaDataString = String.format("%s=%d", "type", aNode.getEvent(i).getType());
-                }
+                eventNode.setMetaData("type", aNode.getEvent(i).getType());
+                eventNode.metaDataString = String.format("%s=%d", "type", aNode.getEvent(i).getType());
 
                 // update branchNode
-                nodes.add(eventNode);
                 branchNode = eventNode;
             }
 
-            // connect final branchNode to the original parent
-            if (endNode != null) {
-                branchNode.setParent(endNode);
-                if (endNode.getLeft() == startNode) {
-                    endNode.setLeft(branchNode);
-                } else {
-                    endNode.setRight(branchNode);
-                }
+            // mark new root
+            if (endNode == null) {
+                newRoot = branchNode;
+                continue;
             }
+
+            // ensure final branchNode is connected to the original parent
+            branchNode.setParent(endNode);
+            if (endNode.getLeft() == startNode) {
+                endNode.setLeft(branchNode);
+            } else {
+                endNode.setRight(branchNode);
+            }
+            endNode.setMetaData("type", ((AnnotatedNode)node.getParent()).getType());
+            endNode.metaDataString = String.format("%s=%d", "type", ((AnnotatedNode)node.getParent()).getType());
         }
 
-        // number in order for resetting the root
-        for (int i = 0; i < nodes.size(); i++) {
-            nodes.get(i).setNr(i);
-        }
+        // post-hoc, renumber internal nodes
+        numberInternalNodes(newRoot, newRoot.getAllLeafNodes().size());
 
-        // re-initialize
-        tree = new Tree(nodes.get(nodes.size() - 1));
-        return tree;
+        return new Tree(newRoot);
+    }
+
+    // helper to assign sensible node numbers to each internal node (children before parents)
+    private int numberInternalNodes(Node node, int nextNr) {
+        if (node.isLeaf())
+            return nextNr;
+
+        for (Node child : node.getChildren())
+            nextNr = numberInternalNodes(child, nextNr);
+
+        node.setNr(nextNr);
+        //node.setID(String.valueOf(nextNr));
+
+        return nextNr + 1;
     }
 
 
@@ -514,14 +527,13 @@ public class AnnotatedTree extends Tree {
         StackTraceElement[] ste = Thread.currentThread().getStackTrace();
         if (ste[2].getMethodName().equals("toXML")) {
             // use toShortNewick to generate Newick string without taxon labels
-            return convertAnnotatedTree(false).getRoot().toShortNewick(true);
+            return convertAnnotatedTree().getRoot().toShortNewick(true);
         } else{
-            // TODO: add different options for logging (with/without type, with/without hidden events)
-            return convertAnnotatedTree(false).getRoot().toSortedNewick(new int[1], true);
+            return convertAnnotatedTree().getRoot().toSortedNewick(new int[1], true);
         }
     }
 
-    // TODO: currently different from MultiTypeTree version
+    // TODO: currently slightly different from MultiTypeTree version
     /**
      * Reconstruct tree from XML fragment in the form of a DOM node *
      */
@@ -530,8 +542,9 @@ public class AnnotatedTree extends Tree {
         Tree tree = new TreeParser();
         tree.initByName(
                 "newick", node.getTextContent(),
-                "adjustTipHeights", false,
-                "IsLabelledNewick", false);
+                "adjustTipHeights", true,
+                "IsLabelledNewick", false,
+                "offset", 0);
 
         boolean containsEvents = false;
         for (int i = 0; i < tree.getNodeCount(); i++) {
