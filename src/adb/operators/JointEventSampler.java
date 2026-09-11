@@ -27,16 +27,20 @@ public class JointEventSampler extends AnnotatedTreeOperator {
     public Input<Double> scaleFactorInput = new Input<>("scaleFactor",
             "magnitude factor used for scaling", 0.75);
 
+    public Input<Double> proportionBranchesInput = new Input<>("proportionBranches",
+            "proportion of branches to sample events on (default 0.1)", 0.1);
+
     public Input<Boolean> optimiseInput = new Input<>("optimise",
             "flag to indicate that the scale factor is automatically changed in order to achieve a good acceptance rate (default true)", true);
 
     double scaleFactor;
-
+    double proportionBranches;
 
     @Override
     public void initAndValidate() {
         super.initAndValidate();
         scaleFactor = scaleFactorInput.get();
+        proportionBranches = proportionBranchesInput.get();
         // sanity check
         if (upInput.get().size() + downInput.get().size() == 0) {
             Log.warning.println("WARNING: At least one up or down item must be specified");
@@ -81,9 +85,9 @@ public class JointEventSampler extends AnnotatedTreeOperator {
         // scale parameters downwards
         for (int pidx = 0; pidx < downInput.get().size(); pidx++) {
             RealParameter param = downInput.get().get(pidx);
-            for (int i=0; i<param.getDimension(); i++) {
+            for (int i = 0; i<param.getDimension(); i++) {
                 double oldValue = param.getValue(i);
-                double newValue = oldValue/f;
+                double newValue = oldValue / f;
                 if (newValue < param.getLower() || newValue > param.getUpper())
                     return Double.NEGATIVE_INFINITY;
 
@@ -93,15 +97,19 @@ public class JointEventSampler extends AnnotatedTreeOperator {
         }
 
         // resample events
+        double x;
         double newBranchProb;
         for (int i = 0; i < tree.getNodeCount(); i++) {
-            newBranchProb = resampleEvents((AnnotatedNode)tree.getNode(i), true);
-            logHR += (oldBranchProbs[i] - newBranchProb);
+            x = Randomizer.nextDouble();
+            if (x < proportionBranches) {
+                newBranchProb = resampleEvents((AnnotatedNode) tree.getNode(i), true);
+                logHR += (oldBranchProbs[i] - newBranchProb);
+            }
         }
         return logHR;
     }
 
-    // TODO: add optimisation of scaling factor
+
     /**
      * automatic parameter tuning *
      */
