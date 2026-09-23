@@ -1,10 +1,10 @@
 # ADB
 
-This repository provides a [BEAST 2](http://www.beast2.org) package for performing phylodynamic inference under the **Age-Dependent Branching** process :deciduous_tree: :chart_with_upwards_trend:.
+This repository provides a [BEAST 2](http://www.beast2.org) package for performing phylodynamic inference under the **Age-Dependent Branching** model :deciduous_tree: :chart_with_upwards_trend:.
 
-The [preprint](https://doi.org/10.1101/2025.08.28.672870) describing the phylodynamic model and its applications is available on bioRxiv[^readme-1].
+The phylodynamic model and its applications are described in this [publication](https://doi.org/10.1093/molbev/msag080)[^readme-1].
 
-[^readme-1]: Mulberry, N., Pilarski, J., Dinger, J., & Stadler, T. (2025). Bayesian phylodynamics for developmental biology: incorporating age-dependence. *bioRxiv*, 2025-08.
+[^readme-1]: Mulberry, N., Pilarski, J., Dinger, J., & Stadler, T. (2026). Age-dependent phylodynamics with application to single-cell lineage trees. *Molecular Biology and Evolution*, 43(4), msag080.
 
 ## The process
 
@@ -32,18 +32,20 @@ We thus recommend to only use the ADB package when there is prior expectation of
 
 ### Software requirements
 
-This package requires Java 17 and at least BEAST v2.7.
+This package requires Java 25 and at least BEAST v2.8.
 
-### Running on command line
+### Building from source
 
-Currently, you can run a bundled version of the package and its dependencies on the command line.
+To build ADB from source you need the following to be installed:
+- OpenJDK version 25 or greater
+- the Apache Maven build system
 
-To run ADB with the example XML, use the following command:
+Once these are installed and in your execution path, issue the following command from the root directory of this repository:
 
-```bash
-java -jar bin/ADB.jar example/inference.xml
+```sh
+mvn package
 ```
-and specify the package versions using `-version_file version.xml`.
+This will compile the package, run a collection of unit tests, and produce the package archive. The package archive will be left in the `target/` subdirectory.
 
 :female_detective: We recommend running the package with option `-loglevel debug`. This enables monitoring numerical errors in the phylodynamic likelihood calculation.
 
