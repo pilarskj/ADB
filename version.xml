@@ -1,8 +1,4 @@
 <package name="ADB" version="0.0.1">
   <depends on="BEAST.base" atleast="2.8.0" atmost="2.8.9"/>
   <depends on="BEAST.app" atleast="2.8.0" atmost="2.8.9"/>
-
-  <service type="beast.base.core.BEASTInterface">
-    <provider classname="adb.GammaBranchingModel"/>
-  </service>
 </package>

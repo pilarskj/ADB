@@ -1,10 +1,6 @@
-package test.adb;
+package adb;
 
-import adb.GammaLogLikelihood;
 import org.junit.jupiter.api.Test;
-
-import java.util.Arrays;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 // A small test for the main function in GammaLogLikelihood class
@@ -16,7 +12,7 @@ public class GammaLogLikelihoodTest {
         // phylodynamic parameters
         double a = 1;
         int b = 1;
-        double d = 0;
+        double d = 0.1;
         double rho = 0.1;
         double origin = 12;
 
@@ -40,8 +36,13 @@ public class GammaLogLikelihoodTest {
         GammaLogLikelihood.Densities densities = GammaLogLikelihood.getDensities(a, b, origin, mP);
         double[] P0 = GammaLogLikelihood.calcP0(densities.pdfFFT, densities.cdf, d, rho, densities.dx, maxIt, tolP);
         double[] P1 = GammaLogLikelihood.calcP1(densities.pdfFFT, densities.cdf, P0, d, rho, densities.dx, maxIt, tolP);
-        double adb = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, intS, intE, extE, maxIt, tolB, mB, false);
-        System.out.println("ADB logL = " + adb);
-        assertEquals(adb, bd,  0.05);
+        double adbE = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, intS, intE, extE, maxIt, tolB, mB, false);
+        System.out.println("ADB exact logL = " + adbE);
+        assertEquals(adbE, bd,  0.05);
+
+        // ADB approximate solution
+        double adbA = GammaLogLikelihood.calcLogLikelihood(a, b, d, rho, densities, P0, P1, intS, intE, extE, maxIt, tolB, mB, true);
+        System.out.println("ADB approx logL = " + adbA);
+        assertEquals(adbA, bd,  0.05);
     }
 }

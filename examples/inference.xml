@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beast version="2.8" namespace="
+  beast.base.spec.domain:
+  beast.base.spec.inference.parameter:
+  beast.base.spec.inference.distribution:
+  beast.base.spec.inference.operator">
+
+
+<!-- input data (dummy sequences for n taxa) -->
+<data id="alignment" name="alignment">
+  <plate var="i" range="1:100">
+    <sequence id="seq_$(i)" taxon="$(i)" value="-"/>
+  </plate>
+</data>
+
+<!-- taxa -->
+<taxonset id="taxonSet" spec="beast.base.evolution.alignment.TaxonSet">
+  <alignment idref="alignment"/>
+</taxonset>
+
+<!-- tip dates (origin) -->
+<trait id="dateTrait" spec="beast.base.evolution.tree.TraitSet"
+  taxa="@taxonSet" traitname="date-forward" value="1=110"/>
+
+<!-- tree (read using feast) -->
+<!-- this tree has been simulated with the R package scTreeSim under ADB with parameters k=5, l=10, d=0.1, p=0.1 -->
+<tree id="tree" spec="feast.fileio.TreeFromNewickFile" fileName="tree.newick"
+  IsLabelledNewick="true" adjustTipHeights="true">
+  <taxonset idref="taxonSet"/>
+  <trait idref="dateTrait"/>
+</tree>
+
+
+<!-- run MCMC with sampling from the prior -->
+<run id="mcmc" spec="beast.base.inference.MCMC" chainLength="100000" sampleFromPrior="true">
+  
+  <operatorschedule spec="beast.base.evolution.operator.kernel.BactrianOperatorSchedule" autoOptimize="true"/>
+
+  <!-- state node -->
+  <state id="state" spec="beast.base.inference.State" storeEvery="100">
+
+    <!-- ADB parameters with intial values-->
+    <parameter id="lifetime" spec="RealScalarParam" domain="PositiveReal" value="5.0" name="stateNode"/>
+    <parameter id="shape" spec="IntScalarParam" domain="PositiveInt" value="5" name="stateNode"/>
+    <parameter id="deathprob" spec="RealScalarParam" domain="UnitInterval" value="0.1" name="stateNode"/>
+    <parameter id="rho" spec="RealScalarParam" domain="UnitInterval" value="0.5" name="stateNode"/>
+
+  </state>
+
+
+  <!-- distributions -->
+  <distribution id="posterior" spec="beast.base.inference.CompoundDistribution">
+    <distribution id="prior" spec="beast.base.inference.CompoundDistribution" useThreads="true">
+
+      <!-- ADB prior -->
+      <distribution id="adbLikelihood" spec="adb.GammaBranchingModel" tree="@tree" origin="110.0"
+                    lifetime="@lifetime" shapeInteger="@shape" deathprob="@deathprob" rho="@rho"
+                    approx="true" stepSizeP="4096">
+      </distribution>
+
+      <!-- priors on phylodynamic parameters -->
+      <prior id="lifetimePrior" spec="LogNormal" name="distribution" param="@lifetime">
+        <M spec="RealScalarParam" domain="PositiveReal" value="2.0"/>
+        <S spec="RealScalarParam" domain="PositiveReal" value="1.0"/>
+      </prior>
+
+      <prior id="shapePrior" spec="IntUniform" name="distribution" param="@shape">
+        <lower spec="IntScalarParam" domain="PositiveInt" value="1"/>
+        <upper spec="IntScalarParam" domain="PositiveInt" value="100"/>
+      </prior>
+
+      <prior id="deathprobPrior" spec="Beta" name="distribution" param="@deathprob">
+        <alpha spec="RealScalarParam" domain="PositiveReal" value="2.0"/>
+        <beta spec="RealScalarParam" domain="PositiveReal" value="5.0"/>
+      </prior>
+
+      <prior id="rhoPrior" spec="Beta" name="distribution" param="@rho">
+        <alpha spec="RealScalarParam" domain="PositiveReal" value="2.0"/>
+        <beta spec="RealScalarParam" domain="PositiveReal" value="5.0"/>
+      </prior>
+    </distribution>
+
+    <!-- likelihood (ignored) -->
+    <distribution id="likelihood" spec="beast.base.inference.CompoundDistribution" useThreads="true"/>
+  </distribution>
+
+
+  <!-- operators -->
+  <operator id="lifetimeScaler" spec="ScaleOperator" parameter="@lifetime" scaleFactor="0.1" weight="1"/>
+  <!-- <operator id="shapeRandomWalk" spec="IntRandomWalkOperator" parameter="@shape" windowSize="5" weight="2"/> -->
+  <operator id="deathprobScaler" spec="ScaleOperator" parameter="@deathprob" scaleFactor="0.1" weight="1"/>
+  <operator id="rhoScaler" spec="ScaleOperator" parameter="@rho" scaleFactor="0.1" weight="1"/>
+         
+  <!-- joint operator due to correlations -->
+  <operator id="AVMNOperator" spec="beast.base.spec.evolution.operator.AdaptableVarianceMultivariateNormalOperator"
+            beta="0.1" scaleFactor="0.1" weight="1">
+    <transformations spec="Transform$LogTransform">
+      <f idref="lifetime"/>
+    </transformations>
+    <transformations spec="Transform$LogitTransform">
+      <f idref="deathprob"/>
+      <f idref="rho"/>
+    </transformations>
+  </operator>
+
+
+  <!-- loggers -->
+  <!-- screen logger -->
+  <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="100">
+    <log idref="posterior"/>
+    <log spec="beast.base.inference.util.ESS" arg="@posterior"/>
+  </logger>
+
+ <!-- trace logger -->
+  <logger id="tracelog" spec="beast.base.inference.Logger" fileName="inference.log" logEvery="100">
+    <log idref="posterior"/>
+    <log idref="adbLikelihood"/>
+    <log idref="lifetime"/>
+    <log idref="shape"/>
+    <log idref="deathprob"/>
+    <log idref="rho"/>
+  </logger>
+
+</run>
+
+</beast>

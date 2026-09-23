@@ -5,10 +5,10 @@ import beast.base.evolution.speciation.SpeciesTreeDistribution;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.TreeInterface;
 import beast.base.evolution.tree.TreeUtils;
+import beast.base.spec.domain.UnitInterval;
 import beast.base.spec.type.RealScalar;
 import beast.base.spec.type.IntScalar;
 import beast.base.spec.domain.PositiveReal;
-import beast.base.spec.domain.NonNegativeReal;
 import beast.base.spec.domain.PositiveInt;
 import beast.base.spec.inference.parameter.RealScalarParam;
 
@@ -17,7 +17,7 @@ import java.util.Arrays;
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
 
-@Description("This model implements an Age-Dependent Branching Process " +
+@Description("This class implements the Age-Dependent Branching phylodynamic model " +
         "with Gamma (or Erlang)-distributed lifetimes, some death probability and extant sampling.")
 public class GammaBranchingModel extends SpeciesTreeDistribution {
 
@@ -28,11 +28,10 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
             new Input<>("shapeInteger", "integer shape parameter of the Erlang distribution");
     final public Input<RealScalar<PositiveReal>> shapeRealParameterInput =
             new Input<>("shapeReal", "real shape parameter of the Gamma distribution");
-    final public Input<RealScalar<NonNegativeReal>> deathParameterInput =
+    final public Input<RealScalar<UnitInterval>> deathParameterInput =
             new Input<>("deathprob", "probability of death at branching times (default 0)", new RealScalarParam<>(0.0, UnitInterval.INSTANCE));
-    final public Input<RealScalar<PositiveReal>> rhoParameterInput =
+    final public Input<RealScalar<UnitInterval>> rhoParameterInput =
             new Input<>("rho", "sampling probability at the end of the process (default 1)", new RealScalarParam<>(1.0, UnitInterval.INSTANCE));
-    // TODO: or for probabilities Input<Simplex> with default SimplexParam(new double[] {1.0})?
     final public Input<Double> originInput =
             new Input<>("origin", "time of origin of the process");
 
@@ -65,7 +64,6 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
         }
 
         // check type of shape
-        // TODO: no input allowed? how is .get() different from .get.getValue()?
         if (shapeIntegerParameterInput.get() == null && shapeRealParameterInput.get() == null) {
             throw new IllegalArgumentException("Please specify a shape parameter");
         } else if (shapeIntegerParameterInput.get() != null && shapeRealParameterInput.get() != null) {
@@ -102,19 +100,19 @@ public class GammaBranchingModel extends SpeciesTreeDistribution {
     public double calculateTreeLogLikelihood(final TreeInterface tree) {
 
         // parameters
-        double C = lifetimeParameterInput.get().getValue(); // l // TODO: .getValue() valid?
+        double C = lifetimeParameterInput.get().get();
         Number b = null; // k
         if (shapeIntegerParameterInput.get() != null) {
-            b = shapeIntegerParameterInput.get().getValue();
+            b = shapeIntegerParameterInput.get().get();
         } else if (shapeRealParameterInput.get() != null) {
-            b = shapeRealParameterInput.get().getValue();
+            b = shapeRealParameterInput.get().get();
         }
-        double d = deathParameterInput.get().getValue();
-        double rho = rhoParameterInput.get().getValue();
+        double d = deathParameterInput.get().get();
+        double rho = rhoParameterInput.get().get();
 
         double origin = 0; // initialize and update with provided origin
         if (originInput.get() != null) {
-            origin = originInput.get().getValue();
+            origin = originInput.get();
 
             // stop if tree origin is smaller than root height
             if (tree.getRoot().getHeight() >= origin) {

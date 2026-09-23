@@ -1,8 +1,8 @@
-open module my.beast.example {
+open module adb {
     requires beast.pkgmgmt;
     requires beast.base;
     requires org.apache.commons.statistics.distribution;
-    requires org.apache.commons.math3;
+    requires commons.math3;
 
     exports adb;
 

@@ -35,15 +35,15 @@
     </dependencySets>
 
     <fileSets>
-        <!-- examples/ (if present) TODO: update -->
+        <!-- examples/ -->
         <fileSet>
-            <directory>${project.basedir}/src/test/resources/my.beast.example/examples</directory>
+            <directory>${project.basedir}/examples</directory>
             <outputDirectory>/examples</outputDirectory>
         </fileSet>
-        <!-- fxtemplates/ (if present; use JPMS module-namespaced resource path) TODO: update after creating BEAUti template -->
+        <!-- fxtemplates/ (if present; use JPMS module-namespaced resource path)
         <fileSet>
-            <directory>${project.basedir}/src/main/resources/my.beast.example/fxtemplates</directory>
+            <directory>${project.basedir}/src/main/resources/adb/fxtemplates</directory>
             <outputDirectory>/fxtemplates</outputDirectory>
-        </fileSet>
+        </fileSet> -->
     </fileSets>
 </assembly>
