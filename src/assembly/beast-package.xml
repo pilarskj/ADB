@@ -19,6 +19,11 @@
             <destName>${beast.pkg.name}.src.jar</destName>
             <outputDirectory>/</outputDirectory>
         </file>
+        <!-- license -->
+        <file>
+            <source>${project.basedir}/LICENSE</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
     </files>
 
     <!-- Only include your own JARs (and any third-party runtime deps).

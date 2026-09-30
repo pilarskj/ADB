@@ -6,7 +6,7 @@
 
     <groupId>io.github.pilarskj</groupId>
     <artifactId>ADB</artifactId>
-    <version>0.0.1</version>
+    <version>0.1.0</version>
 
     <name>ADB</name>
     <description>Age-dependent branching model for phylodynamic inference</description>
@@ -15,8 +15,8 @@
 
     <licenses>
         <license>
-            <name>GNU Lesser General Public License v3.0</name>
-            <url>https://www.gnu.org/licenses/lgpl-3.0.html</url>
+            <name>GNU General Public License v3.0</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
         </license>
     </licenses>
 
