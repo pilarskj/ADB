@@ -8,6 +8,7 @@ src/META-INF/
 
 ### Maven ###
 target/
+release.sh
 
 ### Mac OS ###
 .DS_Store

@@ -108,7 +108,7 @@
   <!-- screen logger -->
   <logger id="screenlog" spec="beast.base.inference.Logger" logEvery="100">
     <log idref="posterior"/>
-    <log spec="beast.base.inference.util.ESS" arg="@posterior"/>
+    <log spec="beast.base.spec.inference.util.ESS" arg="@posterior"/>
   </logger>
 
  <!-- trace logger -->
