@@ -9,6 +9,7 @@
     <provider classname="adb.operators.AnnotatedExchange"/>
     <provider classname="adb.operators.AnnotatedScale"/>
     <provider classname="adb.operators.AnnotatedSubtreeSlide"/>
+    <provider classname="adb.operators.AnnotatedUniform"/>
     <provider classname="adb.operators.AnnotatedWilsonBalding"/>
     <provider classname="adb.operators.EventSampler"/>
     <provider classname="adb.operators.UpDownEventSampler"/>

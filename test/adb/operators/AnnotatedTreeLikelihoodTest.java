@@ -151,6 +151,15 @@ public class AnnotatedTreeLikelihoodTest {
         }, true);
     }
 
+    @Test
+    public void testUniform() {
+        assertIncrementalMatchesFull(tree -> {
+            AnnotatedUniform operator = new AnnotatedUniform();
+            operator.initByName("tree", tree, "parameterization", model(), "weight", 1.0);
+            return operator;
+        }, true);
+    }
+
     private AnnotatedExchange exchange(Tree tree, boolean narrow) {
         AnnotatedExchange operator = new AnnotatedExchange();
         operator.initByName("tree", tree, "parameterization", model(), "isNarrow", narrow, "weight", 1.0);

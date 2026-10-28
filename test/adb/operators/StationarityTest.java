@@ -196,6 +196,14 @@ public class StationarityTest {
         return operator;
     }
 
+    /** EventSampler with the conditional event count, which reads P0 from the density of the samples. */
+    static Operator conditionalEventSampler(ExactTreeSamples samples, double proportionBranches) {
+        EventSampler operator = new EventSampler();
+        operator.initByName("tree", samples.tree, "parameterization", samples.model, "treeDistribution", samples.density,
+                "drawEventCount", true, "proportionBranches", proportionBranches, "optimise", false, "weight", 1.0);
+        return operator;
+    }
+
     static Operator wilsonBalding(ExactTreeSamples samples) {
         AnnotatedWilsonBalding operator = new AnnotatedWilsonBalding();
         operator.initByName("tree", samples.tree, "parameterization", samples.model, "weight", 1.0);
@@ -221,9 +229,35 @@ public class StationarityTest {
         return operator;
     }
 
+    static Operator uniform(ExactTreeSamples samples, boolean conditional) {
+        AnnotatedUniform operator = new AnnotatedUniform();
+        if (conditional) {
+            operator.initByName("tree", samples.tree, "parameterization", samples.model, "treeDistribution", samples.density,
+                    "weight", 1.0);
+        } else {
+            operator.initByName("tree", samples.tree, "parameterization", samples.model, "weight", 1.0);
+        }
+        return operator;
+    }
+
     /** The operator with a wrong Hastings ratio (log 2 too large), used to check that the test can fail. */
     static Operator biased(Operator operator) {
         return biased(operator, 2.0);
+    }
+
+    /** The operator with a Hastings ratio that is too large by the factor for every event it adds to the tree. */
+    static Operator countBiased(Operator operator, AnnotatedTree tree, double factor) {
+        return new Operator() {
+            @Override
+            public void initAndValidate() { }
+
+            @Override
+            public double proposal() {
+                double before = statistics(tree, 1)[2]; // hidden events
+                double logHR = operator.proposal();
+                return logHR + (statistics(tree, 1)[2] - before) * Math.log(factor);
+            }
+        };
     }
 
     /** The operator with a Hastings ratio that is too large by the given factor. */
@@ -250,6 +284,27 @@ public class StationarityTest {
     @Test
     public void testEventSamplerOneType() {
         assertStationary(stationarity(ONE, "EventSampler", StationarityTest::eventSampler));
+    }
+
+    // A constant offset barely changes a proposal that is close to the conditional of the events (it only raises the
+    // acceptance), so the control is off in the count instead, as a wrong factor per hidden event would be
+    @Test
+    public void testControlCountBiasedConditionalEventSamplerFails() {
+        Result result = stationarity(ONE, "conditional EventSampler with Hastings ratio + log 1.5 per added event",
+                samples -> countBiased(conditionalEventSampler(samples, 0.5), samples.tree, 1.5));
+        assertTrue(drifts(result), "a Hastings ratio that is off by log 1.5 per added event must be detected");
+    }
+
+    @Test
+    public void testConditionalEventSamplerOneType() {
+        assertStationary(stationarity(ONE, "conditional EventSampler", samples -> conditionalEventSampler(samples, 0.5)));
+    }
+
+    // all branches at once: the near-Gibbs block update of the events given the tree
+    @Test
+    public void testConditionalEventSamplerAllBranchesOneType() {
+        assertStationary(stationarity(ONE, "conditional EventSampler, all branches",
+                samples -> conditionalEventSampler(samples, 1.0)));
     }
 
     @Test
@@ -350,5 +405,32 @@ public class StationarityTest {
     @Test
     public void testScaleDrawEventsThreeTypes() {
         assertStationary(stationarity(THREE, "scale, drawEvents", samples -> scale(samples, true)));
+    }
+
+    @Test
+    public void testControlCountBiasedUniformFails() {
+        Result result = stationarity(ONE, "conditional uniform with Hastings ratio + log 1.5 per added event",
+                samples -> countBiased(uniform(samples, true), samples.tree, 1.5));
+        assertTrue(drifts(result), "a Hastings ratio that is off by log 1.5 per added event must be detected");
+    }
+
+    @Test
+    public void testUniformOneType() {
+        assertStationary(stationarity(ONE, "uniform", samples -> uniform(samples, false)));
+    }
+
+    @Test
+    public void testConditionalUniformOneType() {
+        assertStationary(stationarity(ONE, "conditional uniform", samples -> uniform(samples, true)));
+    }
+
+    @Test
+    public void testUniformTwoTypes() {
+        assertStationary(stationarity(TWO, "uniform", samples -> uniform(samples, false)));
+    }
+
+    @Test
+    public void testUniformThreeTypes() {
+        assertStationary(stationarity(THREE, "uniform", samples -> uniform(samples, false)));
     }
 }
