@@ -157,6 +157,13 @@ public class P0System {
     }
 
 
+    // takes a solution under the current parameter values that was solved elsewhere (ADBTreeDistribution.solveP0)
+    protected void setP0(double[][] solution) {
+        P0 = solution;
+        dirty = false;
+    }
+
+
     protected void isDirty() {
         if (parameterization.isDirtyCalculation()) {
             dirty = true;

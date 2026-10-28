@@ -92,6 +92,9 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     LifetimeDistributions lifetimeDistributions;
     P0System P0System;
     HashMap<Integer, UnivariateFunction> P0Map;
+    // the last solve of solveP0 and the parameter values it belongs to
+    double[][] proposedP0;
+    double[] proposedP0Values;
 
     // optional
     P1System P1System;
@@ -584,10 +587,86 @@ public class ADBTreeDistribution extends SpeciesTreeDistribution {
     }
 
 
+    /**
+     * P0 of the type at time t under the current parameters: the solution on the grid, linearly interpolated, with
+     * P0(0) = 1 - sampling, as in the density, and constant beyond the grid. Used by the conditional event count of
+     * the operators (AnnotatedTreeOperator). The solve is renewed only when BEAST marks the parameters dirty, after a
+     * proposal: a parameter changed within the current proposal is not seen, so P0 is the one of the state before it.
+     */
+    public double getP0(int type, double t) {
+        return getP0(P0System.getP0(), type, t);
+    }
+
+    /** As getP0, for a grid solution P0 from solveP0. */
+    public double getP0(double[][] P0, int type, double t) {
+        double x = Math.max(0.0, t / timeStep);
+        int i = (int) Math.floor(x);
+        if (i >= nSteps) return P0[type][nSteps - 1];
+        double lower = i == 0 ? 1 - parameterization.getSampling(type) : P0[type][i - 1];
+        return lower + (x - i) * (P0[type][i] - lower);
+    }
+
+
+    /** Mean of getP0 over [start, end], exact for the interpolation (trapezoid on every grid cell). */
+    public double getMeanP0(int type, double start, double end) {
+        return getMeanP0(P0System.getP0(), type, start, end);
+    }
+
+    /** As getMeanP0, for a grid solution P0 from solveP0. */
+    public double getMeanP0(double[][] P0, int type, double start, double end) {
+        double sum = 0;
+        for (int i = (int) Math.floor(start / timeStep); i * timeStep < end; i++) {
+            double lower = Math.max(start, i * timeStep);
+            double upper = i >= nSteps ? end : Math.min(end, (i + 1) * timeStep); // constant beyond the grid
+            if (upper > lower) sum += (upper - lower) * (getP0(P0, type, lower) + getP0(P0, type, upper)) / 2;
+            if (i >= nSteps) break;
+        }
+        return sum / (end - start);
+    }
+
+
+    /**
+     * Solves P0 on the grid under the current parameter values, separately from the solve of the density, which must
+     * keep P0 of the state before the proposal (it is stored after the proposal and restored on rejection). Used by
+     * operators that change the parameters before they redraw events with the conditional count (UpDownEventSampler).
+     * The density takes over this solve when it renews its own under the same parameter values (requiresRecalculation),
+     * so a proposal costs one solve.
+     */
+    public double[][] solveP0() {
+        LifetimeDistributions lifetimes = new LifetimeDistributions(parameterization.getLifetimeParameter(),
+                parameterization.getShapeParameter(), timeArray);
+        proposedP0 = new P0System(parameterization, lifetimes, maxIt, tol, timeArray, timeStep).getP0();
+        proposedP0Values = P0Values();
+        return proposedP0;
+    }
+
+    // the parameter values that P0 depends on (the grid is fixed)
+    private double[] P0Values() {
+        double[] values = new double[nTypes * (4 + 2 * nTypes)];
+        int v = 0;
+        for (int i = 0; i < nTypes; i++) {
+            values[v++] = parameterization.getLifetime(i);
+            values[v++] = parameterization.getShape(i);
+            values[v++] = parameterization.getDeath(i);
+            values[v++] = parameterization.getSampling(i);
+            for (int j = 0; j < nTypes; j++) {
+                values[v++] = parameterization.getSymTransition(i, j);
+                values[v++] = parameterization.getAsymTransition(i, j);
+            }
+        }
+        return values;
+    }
+
+
     @Override
     public boolean requiresRecalculation() {
         lifetimeDistributions.findDirty();
         P0System.isDirty();
+        // take over the solve of an operator under the proposed parameters (solveP0) instead of solving again
+        if (P0System.dirty && proposedP0 != null && Arrays.equals(proposedP0Values, P0Values())) {
+            P0System.setP0(proposedP0);
+        }
+        proposedP0 = null;
         if (!(tree instanceof AnnotatedTree)) {
             P1System.isDirty();
         }

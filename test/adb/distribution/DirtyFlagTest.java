@@ -1,5 +1,6 @@
 package adb.distribution;
 
+import adb.tree.AnnotatedTreeParser;
 import adb.util.Utils;
 import beast.base.inference.parameter.IntegerParameter;
 import beast.base.inference.parameter.RealParameter;
@@ -110,5 +111,39 @@ public class DirtyFlagTest {
 
         p0System.restore();
         assertArrayEquals(old, p0System.getP0()[0], 0.0);
+    }
+
+    // the density takes over the solve of an operator under the proposed parameters (solveP0) when it renews its own
+    // under the same values, so a proposal costs one solve; under other values it solves again
+    @Test
+    public void testDensityTakesOverTheProposedP0() {
+        RealParameter lifetime = new RealParameter("1.0");
+        Parameterization model = new Parameterization();
+        model.initByName("nTypes", 1, "lifetime", lifetime, "shape", new RealParameter("3.0"),
+                "death", new RealParameter("0.1"), "sampling", new RealParameter("0.3"), "originTime", 3.0);
+        AnnotatedTreeParser tree = new AnnotatedTreeParser();
+        tree.initByName("newick", "(((1:0.35):0.65,2:1.0):0.45);");
+        ADBTreeDistribution density = new ADBTreeDistribution();
+        density.initByName("tree", tree, "parameterization", model, "nSteps", 1 << 10);
+
+        // as in a proposal: the operator changes the lifetime and solves P0; BEAST then marks P0 dirty
+        density.P0System.store();
+        lifetime.setValue(1.5);
+        double[][] proposed = density.solveP0();
+        density.P0System.dirty = true;
+        density.requiresRecalculation();
+        assertSame(proposed, density.P0System.getP0(), "the proposed solve must be taken over");
+
+        // a fresh solve under the same values gives the same P0
+        density.P0System.dirty = true;
+        assertArrayEquals(proposed[0], density.P0System.getP0()[0], 0.0);
+
+        // a solve under other values is not taken over
+        double[][] stale = density.solveP0();
+        lifetime.setValue(2.0);
+        density.P0System.dirty = true;
+        density.requiresRecalculation();
+        assertNotSame(stale, density.P0System.getP0());
+        assertFalse(java.util.Arrays.equals(stale[0], density.P0System.getP0()[0]), "P0 must be solved under the new values");
     }
 }

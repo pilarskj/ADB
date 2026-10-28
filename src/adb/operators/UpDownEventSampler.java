@@ -25,6 +25,8 @@ import java.util.List;
  * so the reverse move redraws the same branches; proportionBranches is then not used.
  * Redrawing only helps for parameters that the event proposal uses, the lifetime and the shape: for others, such as
  * the death or sampling probability, the redrawn events do not follow the change, which only lowers the acceptance.
+ * With treeDistribution, the counts are drawn from their conditional (see AnnotatedTreeOperator), which also uses the
+ * death and sampling probability; P0 under the new parameters is then solved once per proposal (treeDistribution.solveP0).
  */
 @Description("Scales parameters up and down with a Bactrian kernel and redraws the hidden events on a subset of branches (random, or those carrying one type with elementWise)")
 public class UpDownEventSampler extends AnnotatedTreeOperator {
@@ -112,10 +114,13 @@ public class UpDownEventSampler extends AnnotatedTreeOperator {
         logHR += scaleParameters(downInput.get(), type, 1.0 / f);
         if (logHR == Double.NEGATIVE_INFINITY) return logHR;
 
-        // redraw the events of the chosen branches under the new parameters
+        // redraw the events of the chosen branches under the new parameters; the conditional count needs P0 under them,
+        // which the density solves only after the proposal
+        if (treeDistribution != null && !chosen.isEmpty()) proposedP0 = treeDistribution.solveP0();
         for (AnnotatedNode node : chosen) {
             logHR -= resampleEvents(node, true);
         }
+        proposedP0 = null;
         return logHR;
     }
 

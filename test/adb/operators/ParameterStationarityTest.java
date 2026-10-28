@@ -1,5 +1,6 @@
 package adb.operators;
 
+import adb.distribution.ADBTreeDistribution;
 import adb.distribution.Parameterization;
 import adb.tree.AnnotatedTree;
 import beast.base.inference.Operator;
@@ -155,6 +156,32 @@ public class ParameterStationarityTest {
     }
 
 
+    /**
+     * UpDownEventSampler with the conditional count, on all branches. The density of the operator's model must give P0
+     * of the current parameters when the proposal starts, as the density of the posterior does in the MCMC; without a
+     * State nothing marks it dirty, so it is solved again before every proposal (on a coarse grid, which only changes
+     * the proposal, to keep the test fast).
+     */
+    static Operator conditionalUpDownEventSampler(MovingParameters m) {
+        ADBTreeDistribution density = new ADBTreeDistribution();
+        density.initByName("tree", m.samples().tree, "parameterization", m.model(), "nSteps", 256);
+        UpDownEventSampler operator = new UpDownEventSampler();
+        operator.initByName("tree", m.samples().tree, "parameterization", m.model(), "treeDistribution", density,
+                "up", m.lifetime(), "down", m.other(), "scaleFactor", 0.2, "proportionBranches", 1.0,
+                "optimise", false, "weight", 1.0);
+        return new Operator() {
+            @Override
+            public void initAndValidate() { }
+
+            @Override
+            public double proposal() {
+                density.initAndValidate();
+                return operator.proposal();
+            }
+        };
+    }
+
+
     // the tree and the lifetime go up together (time-scale ridge), the other parameter inversely
     static Operator scale(MovingParameters m, boolean drawEvents) {
         AnnotatedScale operator = new AnnotatedScale();
@@ -229,6 +256,14 @@ public class ParameterStationarityTest {
         Result result = stationarity(ONE, "UpDownEventSampler with Hastings ratio + log 2",
                 m -> biased(upDownEventSampler(m, false)));
         assertTrue(drifts(result), "a Hastings ratio that is off by log 2 must be detected");
+    }
+
+    // no control: with all branches redrawn under the operator's lifetime, which the target does not use, the acceptance
+    // is 6-11% and neither a Hastings ratio off by log 2 nor P0 of the old parameters is detected (|z| < 3). That the
+    // proposal uses P0 of the new parameters is checked exactly in ConditionalEventCountTest.
+    @Test
+    public void testConditionalUpDownEventSamplerOneType() {
+        assertStationary(stationarity(ONE, "conditional UpDownEventSampler", ParameterStationarityTest::conditionalUpDownEventSampler));
     }
 
     @Test

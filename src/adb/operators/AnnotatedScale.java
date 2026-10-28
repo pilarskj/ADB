@@ -112,7 +112,10 @@ public class AnnotatedScale extends AnnotatedTreeOperator {
 
         // map the events of every branch onto its new interval: by f below the root, from [root, origin] onto
         // [new root, origin] on the stem; events that are not redrawn count in the Jacobian, otherwise the type changes;
-        // then redraw the hidden events between the kept type changes, under the new parameters
+        // then redraw the hidden events between the kept type changes, under the new parameters (the conditional count
+        // needs P0 under them, which the density solves only after the proposal)
+        boolean scalesParameters = !parametersInput.get().isEmpty() || !parametersInverseInput.get().isEmpty();
+        if (treeDistribution != null && scalesParameters) proposedP0 = treeDistribution.solveP0();
         for (Node node : nodes) {
             AnnotatedNode annotated = (AnnotatedNode) node;
             boolean redraw = drawEvents || node.isRoot();
@@ -125,6 +128,7 @@ public class AnnotatedScale extends AnnotatedTreeOperator {
                 logHR -= resampleEvents(annotated, true); // also syncs the root event without origin
             }
         }
+        proposedP0 = null;
 
         // return Hastings ratio
         return logHR;
